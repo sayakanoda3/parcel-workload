@@ -25,7 +25,7 @@ const defaultResiduals: Residuals = {
 const defaultStaff: Staff = {
   MH:      [2,6,6,6,6,6,6,3,3,3,3,1,1],
   'SS/FS': [0,2,2,2,2,2,2,1,1,1,1,1,1],
-  Pack:    [0,7,7,7,7,7,7,7,7,7,7,3,3],
+  Pack:    [0,6,6,6,6,6,6,6,6,3,3,3,3],
 }
 
 const defaultCap: { [cat: string]: number } = { MH: 40, 'SS/FS': 30, Pack: 7 }
