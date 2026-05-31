@@ -62,54 +62,25 @@ export default function Home() {
 
   useEffect(() => { loadTodayData() }, [loadTodayData])
 
-  // 優先順位付きで計算：+1が0になってから+2、+2が0になってから+3を処理
   function calcTimeline() {
     const result: { [gid: string]: { [cat: string]: number[] } } = {}
     const gids = ['p1', 'p2', 'p3']
 
     CATS.forEach(cat => {
-      // 各グループの残件数を時間ごとに計算
-      const rems: { [gid: string]: number[] } = {}
-      gids.forEach(gid => {
-        rems[gid] = []
-        let rem = residuals[gid][cat]
-        HOURS.forEach((_, hi) => {
-          // 現在時刻の列には入力値をそのまま表示
-          if (hi === curIdx) {
-            rems[gid].push(Math.max(0, Math.round(rem)))
-            return
-          }
-          if (hi < curIdx) {
-            rems[gid].push(Math.max(0, Math.round(rem)))
-            return
-          }
-          // hi > curIdx: 処理計算
-          rems[gid].push(Math.max(0, Math.round(rem)))
-        })
-      })
-
-      // 優先順位ロジック：前のグループが0になってから次のグループを処理
       gids.forEach(gid => { result[gid] = result[gid] || {} })
 
-      // 各時間ごとに処理
       const remValues: { [gid: string]: number } = {}
       gids.forEach(gid => { remValues[gid] = residuals[gid][cat] })
 
       const rows: { [gid: string]: number[] } = { p1: [], p2: [], p3: [] }
 
       HOURS.forEach((_, hi) => {
-        // 現在時刻以前は入力値そのまま（現在時刻列も入力値）
         if (hi <= curIdx) {
           gids.forEach(gid => rows[gid].push(Math.max(0, Math.round(remValues[gid]))))
           return
         }
-
-        // 前の時間からの残件数を引き継ぐ
         const s = staff[cat][Math.min(hi - 1, staff[cat].length - 1)] || 0
-        const throughput = s * cap[cat]
-        let remaining = throughput
-
-        // +1から優先的に処理
+        let remaining = s * cap[cat]
         for (const gid of gids) {
           const consume = Math.min(remValues[gid], remaining)
           remValues[gid] = Math.max(0, remValues[gid] - consume)
@@ -140,15 +111,26 @@ export default function Home() {
 
   function getTimelineWithSaved(timeline: ReturnType<typeof calcTimeline>) {
     const result = JSON.parse(JSON.stringify(timeline))
-    Object.entries(savedData).forEach(([hour, groups]) => {
-      const hi = HOURS.indexOf(hour)
-      if (hi < 0 || hi >= curIdx) return
-      Object.entries(groups).forEach(([gid, cats]) => {
-        Object.entries(cats as { [cat: string]: number }).forEach(([cat, val]) => {
-          if (result[gid]?.[cat]) result[gid][cat][hi] = val
-        })
+    // 現在時刻列に入力値を表示
+    GROUPS.forEach(g => {
+      CATS.forEach(cat => {
+        result[g.id][cat][curIdx] = residuals[g.id][cat]
       })
     })
+    // 過去の保存済みデータを反映、未保存はnullにする
+    for (let hi = 0; hi < curIdx; hi++) {
+      const hour = HOURS[hi]
+      const hasSaved = !!savedData[hour]
+      GROUPS.forEach(g => {
+        CATS.forEach(cat => {
+          if (hasSaved && savedData[hour][g.id]?.[cat] !== undefined) {
+            result[g.id][cat][hi] = savedData[hour][g.id][cat]
+          } else {
+            result[g.id][cat][hi] = null
+          }
+        })
+      })
+    }
     return result
   }
 
@@ -191,9 +173,11 @@ export default function Home() {
     <main className="p-6 max-w-screen-xl mx-auto text-base">
       <h1 className="text-2xl font-medium mb-5">Parcel Workload</h1>
 
-      {/* 上部：横並び */}
-      <div className="flex gap-3 mb-5 flex-wrap items-start">
-        <div className="bg-white border border-gray-200 rounded-xl p-4 w-44">
+      {/* 上部：横並び・高さ揃え */}
+      <div className="flex gap-3 mb-5 flex-wrap items-stretch">
+
+        {/* 現在時刻 */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-between" style={{width:'160px'}}>
           <div className="text-sm text-gray-500 mb-2">🕐 現在時刻</div>
           <select
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
@@ -204,15 +188,16 @@ export default function Home() {
           </select>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 w-56">
+        {/* 推定能力 */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-between" style={{width:'220px'}}>
           <div className="text-sm text-gray-500 mb-2">⚡ 推定能力（件/時間）</div>
-          <div className="flex gap-3">
+          <div className="grid grid-cols-3 gap-2">
             {CATS.map(cat => (
-              <div key={cat}>
-                <div className="text-xs text-gray-400 mb-1">{cat}</div>
+              <div key={cat} className="flex flex-col">
+                <div className="text-xs text-gray-400 mb-1 truncate">{cat}</div>
                 <input
                   type="number" min={1}
-                  className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center"
+                  className="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-sm text-center"
                   value={cap[cat]}
                   onChange={e => setCap(prev => ({ ...prev, [cat]: parseInt(e.target.value) || 1 }))}
                 />
@@ -221,10 +206,11 @@ export default function Home() {
           </div>
         </div>
 
+        {/* サマリーカード */}
         {GROUPS.map(g => {
           const summaryTime = getSummaryTime(timeline, g.id)
           return (
-            <div key={g.id} className={`rounded-xl border-2 p-4 w-52 ${g.bg} ${g.border}`}>
+            <div key={g.id} className={`rounded-xl border-2 p-4 flex flex-col flex-1 min-w-48 ${g.bg} ${g.border}`}>
               <div className="flex items-center justify-between mb-2">
                 <span className={`font-medium text-sm ${g.text}`}>{g.label}</span>
                 <div className="flex items-center gap-1">
@@ -310,9 +296,9 @@ export default function Home() {
                   {GROUPS.map(g => CATS.map(cat => (
                     <tr key={`${g.id}-${cat}`} className={g.rowbg}>
                       <td className={`py-1.5 px-2 font-medium text-sm ${g.text}`}>{g.label} {cat}</td>
-                      {timelineWithSaved[g.id][cat].map((val: number, i: number) => (
+                      {timelineWithSaved[g.id][cat].map((val: number | null, i: number) => (
                         <td key={i} className={`py-1.5 px-2 text-center text-sm ${i === curIdx ? 'bg-blue-50 font-medium' : ''} ${val === 0 ? 'text-green-600 font-medium' : 'text-gray-700'}`}>
-                          {val}
+                          {val === null ? '' : val}
                         </td>
                       ))}
                     </tr>
