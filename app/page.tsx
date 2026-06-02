@@ -17,9 +17,9 @@ type Staff = { [cat: string]: number[] }
 type SavedData = { [hour: string]: { [gid: string]: { [cat: string]: number } } }
 
 const defaultResiduals: Residuals = {
-  p1: { MH: 0, 'SS/FS': 0, Pack: 50 },
-  p2: { MH: 200, 'SS/FS': 50, Pack: 300 },
-  p3: { MH: 150, 'SS/FS': 30, Pack: 200 },
+  p1: { MH: 0, 'SS/FS': 0, Pack: 0 },
+  p2: { MH: 0, 'SS/FS': 0, Pack: 0 },
+  p3: { MH: 0, 'SS/FS': 0, Pack: 0 },
 }
 
 const defaultStaff: Staff = {
@@ -30,16 +30,37 @@ const defaultStaff: Staff = {
 
 const defaultCap: { [cat: string]: number } = { MH: 40, 'SS/FS': 30, Pack: 7 }
 
+// HH:MM形式で現在時刻に最も近い時間枠を返す
+function getNearestHour(): string {
+  const now = new Date()
+  const h = now.getHours()
+  const hStr = h.toString().padStart(2, '0') + ':00'
+  // 8:00〜20:00の範囲に収める
+  if (h < 8) return '08:00'
+  if (h >= 20) return '20:00'
+  return HOURS.includes(hStr) ? hStr : '08:00'
+}
+
 export default function Home() {
-  const [curTime, setCurTime] = useState('08:00')
+  const [curTime, setCurTime] = useState(getNearestHour)
   const [cap, setCap] = useState(defaultCap)
   const [residuals, setResiduals] = useState<Residuals>(defaultResiduals)
   const [staff, setStaff] = useState<Staff>(defaultStaff)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [savedData, setSavedData] = useState<SavedData>({})
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
 
   const curIdx = HOURS.indexOf(curTime)
+
+  // 1分ごとに現在時刻を自動更新
+  useEffect(() => {
+    const update = () => setCurTime(getNearestHour())
+    update()
+    const timer = setInterval(update, 60000)
+    return () => clearInterval(timer)
+  }, [])
 
   const loadTodayData = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0]
@@ -57,6 +78,20 @@ export default function Home() {
       byHour[row.shift_time][row.group_id][row.category] = row.value
     })
     setSavedData(byHour)
+
+    // 最新の保存データを入力欄に反映
+    const latestHour = Object.keys(byHour).sort().pop()
+    if (latestHour) {
+      const latestResiduals: Residuals = JSON.parse(JSON.stringify(defaultResiduals))
+      GROUPS.forEach(g => {
+        CATS.forEach(cat => {
+          if (byHour[latestHour][g.id]?.[cat] !== undefined) {
+            latestResiduals[g.id][cat] = byHour[latestHour][g.id][cat]
+          }
+        })
+      })
+      setResiduals(latestResiduals)
+    }
   }, [])
 
   useEffect(() => { loadTodayData() }, [loadTodayData])
@@ -154,22 +189,75 @@ export default function Home() {
     setTimeout(() => setSaved(false), 2000)
   }
 
+  async function handleReset() {
+    setResetting(true)
+    // Supabaseから当日のデータを全削除
+    const today = new Date().toISOString().split('T')[0]
+    await supabase
+      .from('residuals')
+      .delete()
+      .gte('recorded_at', `${today}T00:00:00`)
+      .lte('recorded_at', `${today}T23:59:59`)
+    await supabase
+      .from('staff_allocation')
+      .delete()
+      .gte('recorded_at', `${today}T00:00:00`)
+      .lte('recorded_at', `${today}T23:59:59`)
+
+    // 画面もリセット
+    setResiduals(JSON.parse(JSON.stringify(defaultResiduals)))
+    setStaff(JSON.parse(JSON.stringify(defaultStaff)))
+    setCap({ ...defaultCap })
+    setSavedData({})
+    setResetting(false)
+    setShowResetConfirm(false)
+  }
+
   const timeline = calcTimeline()
   const timelineWithSaved = getTimelineWithSaved(timeline)
 
   return (
     <main className="p-6 max-w-screen-xl mx-auto text-base">
-      <h1 className="text-2xl font-medium mb-4">Parcel Workload</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-medium">Parcel Workload</h1>
+        <button
+          onClick={() => setShowResetConfirm(true)}
+          className="text-sm text-red-500 border border-red-200 px-4 py-1.5 rounded-lg hover:bg-red-50"
+        >
+          🔄 リセット
+        </button>
+      </div>
 
-      {/* 全体2カラム：左=コントロール、右=サマリー+テーブル */}
+      {/* リセット確認ダイアログ */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 shadow-xl max-w-sm w-full mx-4">
+            <h2 className="text-base font-medium mb-2">本当にリセットしますか？</h2>
+            <p className="text-sm text-gray-500 mb-4">今日のすべての保存データが削除されます。この操作は取り消せません。</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleReset}
+                disabled={resetting}
+                className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+              >
+                {resetting ? '削除中...' : '削除する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-[280px_1fr] gap-4 items-start">
-
         {/* 左カラム */}
         <div className="flex flex-col gap-3">
-
-          {/* 現在時刻 */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-sm text-gray-500 mb-2 flex items-center gap-1">🕐 現在時刻</div>
+            <div className="text-sm text-gray-500 mb-2">🕐 現在時刻</div>
             <select
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
               value={curTime}
@@ -179,9 +267,8 @@ export default function Home() {
             </select>
           </div>
 
-          {/* 推定能力 */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-sm text-gray-500 mb-2 flex items-center gap-1">⚡ 推定能力（件/時間）</div>
+            <div className="text-sm text-gray-500 mb-2">⚡ 推定能力（件/時間）</div>
             <div className="grid grid-cols-3 gap-2">
               {CATS.map(cat => (
                 <div key={cat}>
@@ -197,7 +284,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 残件数入力 */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <span className="font-medium text-base">📦 残件数入力</span>
@@ -232,8 +318,6 @@ export default function Home() {
 
         {/* 右カラム */}
         <div className="flex flex-col gap-3">
-
-          {/* サマリーカード 3つ横並び */}
           <div className="grid grid-cols-3 gap-3">
             {GROUPS.map(g => {
               const summaryTime = getSummaryTime(timeline, g.id)
@@ -273,7 +357,6 @@ export default function Home() {
             })}
           </div>
 
-          {/* 時間別推移テーブル */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="font-medium text-base mb-3">時間別推移テーブル</div>
             <div className="overflow-x-auto">
@@ -302,7 +385,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 人員配置 */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="font-medium text-base mb-3">人員配置</div>
             <div className="overflow-x-auto">
