@@ -30,19 +30,28 @@ const defaultStaff: Staff = {
 
 const defaultCap: { [cat: string]: number } = { MH: 40, 'SS/FS': 30, Pack: 7 }
 
-// HH:MM形式で現在時刻に最も近い時間枠を返す
-function getNearestHour(): string {
+// 現在時刻をHH:MM形式で返す
+function getCurrentTime(): string {
+  const now = new Date()
+  const h = now.getHours().toString().padStart(2, '0')
+  const m = now.getMinutes().toString().padStart(2, '0')
+  return `${h}:${m}`
+}
+
+// 現在時刻に対応するHOURSのインデックスを返す（例：10:23 → 10:00のインデックス）
+function getCurrentHourIdx(): number {
   const now = new Date()
   const h = now.getHours()
+  if (h < 8) return 0
+  if (h >= 21) return HOURS.length - 1
   const hStr = h.toString().padStart(2, '0') + ':00'
-  // 8:00〜20:00の範囲に収める
-  if (h < 8) return '08:00'
-  if (h >= 20) return '20:00'
-  return HOURS.includes(hStr) ? hStr : '08:00'
+  const idx = HOURS.indexOf(hStr)
+  return idx >= 0 ? idx : 0
 }
 
 export default function Home() {
-  const [curTime, setCurTime] = useState(getNearestHour)
+  const [currentTime, setCurrentTime] = useState(getCurrentTime)
+  const [curIdx, setCurIdx] = useState(getCurrentHourIdx)
   const [cap, setCap] = useState(defaultCap)
   const [residuals, setResiduals] = useState<Residuals>(defaultResiduals)
   const [staff, setStaff] = useState<Staff>(defaultStaff)
@@ -52,13 +61,12 @@ export default function Home() {
   const [savedData, setSavedData] = useState<SavedData>({})
   const [showResetConfirm, setShowResetConfirm] = useState(false)
 
-  const curIdx = HOURS.indexOf(curTime)
-
-  // 1分ごとに現在時刻を自動更新
+  // 1分ごとに時刻を更新
   useEffect(() => {
-    const update = () => setCurTime(getNearestHour())
-    update()
-    const timer = setInterval(update, 60000)
+    const timer = setInterval(() => {
+      setCurrentTime(getCurrentTime())
+      setCurIdx(getCurrentHourIdx())
+    }, 60000)
     return () => clearInterval(timer)
   }, [])
 
@@ -71,6 +79,7 @@ export default function Home() {
       .lte('recorded_at', `${today}T23:59:59`)
       .order('recorded_at', { ascending: true })
     if (!data || data.length === 0) return
+
     const byHour: SavedData = {}
     data.forEach((row: any) => {
       if (!byHour[row.shift_time]) byHour[row.shift_time] = {}
@@ -139,11 +148,13 @@ export default function Home() {
 
   function getTimelineWithSaved(timeline: ReturnType<typeof calcTimeline>) {
     const result = JSON.parse(JSON.stringify(timeline))
+    // 現在時刻列に入力値を表示
     GROUPS.forEach(g => {
       CATS.forEach(cat => {
         result[g.id][cat][curIdx] = residuals[g.id][cat]
       })
     })
+    // 過去の保存済みデータを反映、未保存はnull
     for (let hi = 0; hi < curIdx; hi++) {
       const hour = HOURS[hi]
       const hasSaved = !!savedData[hour]
@@ -162,9 +173,10 @@ export default function Home() {
 
   async function handleSave() {
     setSaving(true)
+    const saveHour = HOURS[curIdx]
     const rows = GROUPS.flatMap(g =>
       CATS.map(cat => ({
-        shift_time: curTime,
+        shift_time: saveHour,
         group_id: g.id,
         category: cat,
         value: residuals[g.id][cat],
@@ -180,8 +192,8 @@ export default function Home() {
     )
     await supabase.from('staff_allocation').insert(staffRows)
     setSavedData(prev => {
-      const next = { ...prev, [curTime]: {} as { [gid: string]: { [cat: string]: number } } }
-      GROUPS.forEach(g => { next[curTime][g.id] = { ...residuals[g.id] } })
+      const next = { ...prev, [saveHour]: {} as { [gid: string]: { [cat: string]: number } } }
+      GROUPS.forEach(g => { next[saveHour][g.id] = { ...residuals[g.id] } })
       return next
     })
     setSaving(false)
@@ -191,7 +203,6 @@ export default function Home() {
 
   async function handleReset() {
     setResetting(true)
-    // Supabaseから当日のデータを全削除
     const today = new Date().toISOString().split('T')[0]
     await supabase
       .from('residuals')
@@ -203,8 +214,6 @@ export default function Home() {
       .delete()
       .gte('recorded_at', `${today}T00:00:00`)
       .lte('recorded_at', `${today}T23:59:59`)
-
-    // 画面もリセット
     setResiduals(JSON.parse(JSON.stringify(defaultResiduals)))
     setStaff(JSON.parse(JSON.stringify(defaultStaff)))
     setCap({ ...defaultCap })
@@ -228,7 +237,6 @@ export default function Home() {
         </button>
       </div>
 
-      {/* リセット確認ダイアログ */}
       {showResetConfirm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 shadow-xl max-w-sm w-full mx-4">
@@ -254,17 +262,12 @@ export default function Home() {
       )}
 
       <div className="grid grid-cols-[280px_1fr] gap-4 items-start">
-        {/* 左カラム */}
         <div className="flex flex-col gap-3">
+
+          {/* 現在時刻：分まで表示 */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="text-sm text-gray-500 mb-2">🕐 現在時刻</div>
-            <select
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              value={curTime}
-              onChange={e => setCurTime(e.target.value)}
-            >
-              {HOURS.slice(0, -1).map(h => <option key={h}>{h}</option>)}
-            </select>
+            <div className="text-2xl font-medium text-center py-1">{currentTime}</div>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-4">
@@ -316,7 +319,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 右カラム */}
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-3 gap-3">
             {GROUPS.map(g => {
