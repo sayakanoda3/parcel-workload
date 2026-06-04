@@ -215,6 +215,18 @@ export default function Home() {
           return
         }
 
+        // 保存データがない場合、現在時刻より前は全てnull
+        if (latestSaveHourIdx === -1 && hi < effectiveCurIdx) {
+          gids.forEach(gid => { rows[gid].push(null) })
+          return
+        }
+
+        // 保存データがない場合、現在時刻列は入力値をそのまま表示
+        if (latestSaveHourIdx === -1 && hi === effectiveCurIdx) {
+          gids.forEach(gid => { rows[gid].push(residuals[gid][cat]) })
+          return
+        }
+
         // 保存時刻より後：保存時刻から各時間まで1時間ずつ積み上げて計算
         const remValues: { [gid: string]: number } = {}
         gids.forEach(gid => { remValues[gid] = startValues[gid] })
