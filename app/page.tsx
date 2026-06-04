@@ -71,6 +71,11 @@ export default function Home() {
   const effectiveCurIdx = manualTime !== null ? getHourIdxForTime(manualTime) : curIdx
   const effectiveTime = manualTime ?? currentTime
 
+  // 保存済みの最後のhour index
+  const lastSavedHourIdx = Object.keys(savedStaff).length > 0
+    ? getHourIdxForTime(Object.keys(savedStaff).sort().pop()!)
+    : -1
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(getCurrentTime())
@@ -97,7 +102,6 @@ export default function Home() {
   const loadTodayData = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0]
 
-    // 残件数を読み込む
     const { data } = await supabase
       .from('residuals')
       .select('*')
@@ -123,7 +127,6 @@ export default function Home() {
       }
     }
 
-    // 人員配置を読み込む
     const { data: staffData } = await supabase
       .from('staff_allocation')
       .select('*')
@@ -136,24 +139,19 @@ export default function Home() {
       staffData.forEach((row: any) => {
         if (!row.shift_time) return
         const hourKey = HOURS[getHourIdxForTime(row.shift_time)]
-        if (!byHour[hourKey]) {
-          byHour[hourKey] = { MH: [], 'SS/FS': [], Pack: [] }
-        }
+        if (!byHour[hourKey]) byHour[hourKey] = { MH: [], 'SS/FS': [], Pack: [] }
         if (!byHour[hourKey][row.category]) byHour[hourKey][row.category] = []
         byHour[hourKey][row.category][row.hour_index] = row.staff_count
       })
       setSavedStaff(byHour)
 
-      // 最新の人員配置を反映
       const latestStaffHour = Object.keys(byHour).sort().pop()
       if (latestStaffHour) {
         const newStaff: Staff = JSON.parse(JSON.stringify(defaultStaff))
         CATS.forEach(cat => {
-          if (byHour[latestStaffHour][cat]) {
-            byHour[latestStaffHour][cat].forEach((val, hi) => {
-              if (val !== undefined) newStaff[cat][hi] = val
-            })
-          }
+          byHour[latestStaffHour][cat]?.forEach((val, hi) => {
+            if (val !== undefined) newStaff[cat][hi] = val
+          })
         })
         setStaff(newStaff)
       }
@@ -204,11 +202,7 @@ export default function Home() {
         if (hi < latestSaveHourIdx) {
           gids.forEach(gid => {
             const hourData = savedData[h]
-            if (hourData?.[gid]?.[cat] !== undefined) {
-              rows[gid].push(hourData[gid][cat])
-            } else {
-              rows[gid].push(null)
-            }
+            rows[gid].push(hourData?.[gid]?.[cat] !== undefined ? hourData[gid][cat] : null)
           })
           return
         }
@@ -261,26 +255,22 @@ export default function Home() {
     return !!savedData[HOURS[hi]]
   }
 
-  // 人員配置セルが保存済みかどうか
-  function isSavedStaffCell(hi: number): boolean {
-    return Object.values(savedStaff).some(hourData => {
-      return CATS.some(cat => hourData[cat]?.[hi] !== undefined)
+  // hi番目の列が保存済みかどうか（人員配置）
+  function isStaffSaved(hi: number): boolean {
+    return Object.keys(savedStaff).some(hourKey => {
+      return getHourIdxForTime(hourKey) === hi
     })
   }
 
-  // 保存済み人員配置の最新値を返す
-  function getSavedStaffValue(cat: string, hi: number): number | null {
-    const sortedHours = Object.keys(savedStaff).sort()
-    for (let i = sortedHours.length - 1; i >= 0; i--) {
-      const val = savedStaff[sortedHours[i]]?.[cat]?.[hi]
-      if (val !== undefined) return val
-    }
-    return null
+  // hi番目の列が過去（保存済み時刻より前）かどうか
+  function isStaffPast(hi: number): boolean {
+    return hi < lastSavedHourIdx
   }
 
   async function handleSave() {
     setSaving(true)
     const saveTime = effectiveTime
+
     const rows = GROUPS.flatMap(g =>
       CATS.map(cat => ({
         shift_time: saveTime,
@@ -300,6 +290,7 @@ export default function Home() {
       }))
     )
     await supabase.from('staff_allocation').insert(staffRows)
+
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -458,11 +449,8 @@ export default function Home() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="font-medium text-base mb-3">
-              時間別推移テーブル
-              <span className="ml-3 text-xs font-normal text-blue-500">青字＝保存済み</span>
-              <span className="ml-2 text-xs font-normal text-gray-400">黒字＝予測</span>
-            </div>
+            <div className="font-medium text-base mb-1">時間別推移テーブル</div>
+            <div className="text-xs mb-3"><span className="text-blue-500">青字＝保存済み</span><span className="text-gray-400 ml-2">黒字＝予測</span></div>
             <div className="overflow-x-auto">
               <table className="text-sm w-full border-collapse">
                 <thead>
@@ -480,22 +468,19 @@ export default function Home() {
                   {GROUPS.map(g => CATS.map(cat => (
                     <tr key={`${g.id}-${cat}`} className={g.rowbg}>
                       <td className={`py-1.5 px-2 font-medium text-sm ${g.text}`}>{g.label} {cat}</td>
-                      {timeline[g.id][cat].map((val, i) => {
-                        const isSaved = isSavedCell(i)
-                        return (
-                          <td key={i} className={`py-1.5 px-2 text-center text-sm ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
-                            {val === null ? '' : (
-                              <span className={
-                                val === 0 ? 'text-green-600 font-medium'
-                                : isSaved ? 'text-blue-600 font-medium'
-                                : 'text-gray-700'
-                              }>
-                                {val}
-                              </span>
-                            )}
-                          </td>
-                        )
-                      })}
+                      {timeline[g.id][cat].map((val, i) => (
+                        <td key={i} className={`py-1.5 px-2 text-center text-sm ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
+                          {val === null ? '' : (
+                            <span className={
+                              val === 0 ? 'text-green-600 font-medium'
+                              : isSavedCell(i) ? 'text-blue-600 font-medium'
+                              : 'text-gray-700'
+                            }>
+                              {val}
+                            </span>
+                          )}
+                        </td>
+                      ))}
                     </tr>
                   )))}
                 </tbody>
@@ -505,7 +490,7 @@ export default function Home() {
 
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="font-medium text-base mb-1">人員配置</div>
-            <div className="text-xs text-blue-500 mb-3">青字＝保存済み　<span className="text-gray-400">黒字＝未保存</span></div>
+            <div className="text-xs mb-3"><span className="text-blue-500">青字＝保存済み</span><span className="text-gray-400 ml-2">黒字＝未保存</span><span className="text-gray-300 ml-2">グレー＝編集不可</span></div>
             <div className="overflow-x-auto">
               <table className="text-sm w-full border-collapse">
                 <thead>
@@ -521,23 +506,29 @@ export default function Home() {
                     <tr key={cat}>
                       <td className="py-1.5 px-2 font-medium text-sm text-gray-600">{cat}</td>
                       {staff[cat].map((val, hi) => {
-                        const savedVal = getSavedStaffValue(cat, hi)
-                        const isSaved = savedVal !== null
+                        const isPast = isStaffPast(hi)
+                        const isSaved = isStaffSaved(hi)
                         return (
                           <td key={hi} className={`py-1 px-1 text-center ${hi === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
                             <input
                               type="number" min={0} max={99}
+                              disabled={isPast}
                               className={`w-12 border rounded px-1 py-1 text-center text-sm font-medium
-                                ${hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}
-                                ${isSaved ? 'text-blue-600' : 'text-gray-700'}
+                                ${isPast ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed' :
+                                  isSaved ? 'border-blue-200 text-blue-600' :
+                                  hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50 text-gray-700' :
+                                  'border-gray-200 text-gray-700'}
                               `}
                               value={val}
-                              onFocus={e => e.target.select()}
-                              onChange={e => setStaff(prev => {
-                                const updated = [...prev[cat]]
-                                updated[hi] = parseInt(e.target.value) || 0
-                                return { ...prev, [cat]: updated }
-                              })}
+                              onFocus={e => !isPast && e.target.select()}
+                              onChange={e => {
+                                if (isPast) return
+                                setStaff(prev => {
+                                  const updated = [...prev[cat]]
+                                  updated[hi] = parseInt(e.target.value) || 0
+                                  return { ...prev, [cat]: updated }
+                                })
+                              }}
                             />
                           </td>
                         )
