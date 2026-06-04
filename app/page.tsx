@@ -257,9 +257,7 @@ export default function Home() {
 
   // hi番目の列が保存済みかどうか（人員配置）
   function isStaffSaved(hi: number): boolean {
-    return Object.keys(savedStaff).some(hourKey => {
-      return getHourIdxForTime(hourKey) === hi
-    })
+    return hi <= lastSavedHourIdx && lastSavedHourIdx >= 0
   }
 
   // hi番目の列が過去（保存済み時刻より前）かどうか
