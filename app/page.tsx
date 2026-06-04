@@ -221,14 +221,14 @@ export default function Home() {
         const remValues: { [gid: string]: number } = {}
         gids.forEach(gid => { remValues[gid] = startValues[gid] })
 
-        let totalProcessed = elapsedMin * throughputPerMin
+        let totalProcessed = Math.max(0, elapsedMin * throughputPerMin)
         for (const gid of gids) {
-          const consume = Math.min(remValues[gid], totalProcessed)
+          const consume = Math.min(Math.max(0, remValues[gid]), totalProcessed)
           remValues[gid] = Math.max(0, remValues[gid] - consume)
-          totalProcessed -= consume
+          totalProcessed = Math.max(0, totalProcessed - consume)
         }
 
-        gids.forEach(gid => rows[gid].push(Math.round(remValues[gid])))
+        gids.forEach(gid => rows[gid].push(Math.max(0, Math.round(remValues[gid]))))
       })
 
       gids.forEach(gid => { result[gid][cat] = rows[gid] })
@@ -491,7 +491,6 @@ export default function Home() {
 
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="font-medium text-base mb-1">人員配置</div>
-            <div className="text-xs mb-3"><span className="text-blue-500">青字＝保存済み</span><span className="text-gray-400 ml-2">黒字＝未保存</span><span className="text-gray-300 ml-2">グレー＝編集不可</span></div>
             <div className="overflow-x-auto">
               <table className="text-sm w-full border-collapse">
                 <thead>
