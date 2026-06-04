@@ -24,7 +24,7 @@ const defaultResiduals: Residuals = {
 }
 
 const defaultStaff: Staff = {
-  MH:      [2,6,6,6,6,6,6,3,3,3,3,1,1],
+  MH:      [2,4,4,4,4,4,4,3,3,3,3,1,1],
   'SS/FS': [0,2,2,2,2,2,2,1,1,1,1,1,1],
   Pack:    [0,6,6,6,6,6,6,6,6,3,3,3,3],
 }
