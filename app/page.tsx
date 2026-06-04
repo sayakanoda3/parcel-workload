@@ -196,9 +196,11 @@ export default function Home() {
 
       const saveTimeMin = latestSaveTime ? toMinutes(latestSaveTime) : toMinutes(effectiveTime)
 
-      HOURS.forEach((h, hi) => {
-        const latestSaveHourIdx = latestSavedHour ? getHourIdxForTime(latestSavedHour) : -1
+      // 保存時刻からの累積処理量を時間ごとに計算
+      const latestSaveHourIdx = latestSavedHour ? getHourIdxForTime(latestSavedHour) : -1
 
+      HOURS.forEach((h, hi) => {
+        // 保存前の時間：保存済みデータかnull
         if (hi < latestSaveHourIdx) {
           gids.forEach(gid => {
             const hourData = savedData[h]
@@ -207,25 +209,32 @@ export default function Home() {
           return
         }
 
+        // 保存時刻の時間帯：保存値をそのまま表示
         if (hi === latestSaveHourIdx) {
           gids.forEach(gid => { rows[gid].push(startValues[gid]) })
           return
         }
 
-        const hMin = toMinutes(h)
-        const elapsedMin = Math.max(0, hMin - saveTimeMin)
-        const staffIdx = Math.min(hi - 1, staff[cat].length - 1)
-        const staffCount = staff[cat][Math.max(0, staffIdx)] || 0
-        const throughputPerMin = (staffCount * cap[cat]) / 60
-
+        // 保存時刻より後：保存時刻から各時間まで1時間ずつ積み上げて計算
         const remValues: { [gid: string]: number } = {}
         gids.forEach(gid => { remValues[gid] = startValues[gid] })
 
-        let totalProcessed = Math.max(0, elapsedMin * throughputPerMin)
-        for (const gid of gids) {
-          const consume = Math.min(Math.max(0, remValues[gid]), totalProcessed)
-          remValues[gid] = Math.max(0, remValues[gid] - consume)
-          totalProcessed = Math.max(0, totalProcessed - consume)
+        // 保存時刻(saveTimeMin)から h(hMin) まで、1時間ごとに処理量を積み上げる
+        for (let step = latestSaveHourIdx; step < hi; step++) {
+          const stepHour = HOURS[step]
+          const stepStart = step === latestSaveHourIdx ? saveTimeMin : toMinutes(stepHour)
+          const stepEnd = toMinutes(HOURS[step + 1])
+          const minutes = Math.max(0, stepEnd - stepStart)
+
+          const staffCount = staff[cat][Math.min(step, staff[cat].length - 1)] || 0
+          const processed = (staffCount * cap[cat] / 60) * minutes
+
+          let remaining = Math.max(0, processed)
+          for (const gid of gids) {
+            const consume = Math.min(Math.max(0, remValues[gid]), remaining)
+            remValues[gid] = Math.max(0, remValues[gid] - consume)
+            remaining = Math.max(0, remaining - consume)
+          }
         }
 
         gids.forEach(gid => rows[gid].push(Math.max(0, Math.round(remValues[gid]))))
