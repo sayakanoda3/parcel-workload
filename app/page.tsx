@@ -15,6 +15,7 @@ const GROUPS = [
 type Residuals = { [gid: string]: { [cat: string]: number } }
 type Staff = { [cat: string]: number[] }
 type SavedData = { [hourKey: string]: { [gid: string]: { [cat: string]: number } } }
+type SavedStaff = { [hourKey: string]: { [cat: string]: number[] } }
 
 const defaultResiduals: Residuals = {
   p1: { MH: 0, 'SS/FS': 0, Pack: 0 },
@@ -41,21 +42,11 @@ function getCurrentHourIdx(): number {
   return HOURS.indexOf(h.toString().padStart(2, '0') + ':00')
 }
 
-// HH:MM → 分に変換
 function toMinutes(timeStr: string): number {
   const [h, m] = timeStr.split(':').map(Number)
   return h * 60 + m
 }
 
-// 保存時刻から次の整時までの経過分数を計算
-// 例：9:22保存 → 10:00まで38分
-function minutesUntilNextHour(saveTime: string): number {
-  const [h, m] = saveTime.split(':').map(Number)
-  if (m === 0) return 60
-  return 60 - m
-}
-
-// 保存時刻が属するHOURSのインデックス（9:22→9:00のインデックス）
 function getHourIdxForTime(timeStr: string): number {
   const h = parseInt(timeStr.split(':')[0])
   const clamped = Math.max(8, Math.min(20, h))
@@ -73,6 +64,7 @@ export default function Home() {
   const [saved, setSaved] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [savedData, setSavedData] = useState<SavedData>({})
+  const [savedStaff, setSavedStaff] = useState<SavedStaff>({})
   const [savedTimes, setSavedTimes] = useState<{ [hourKey: string]: string }>({})
   const [showResetConfirm, setShowResetConfirm] = useState(false)
 
@@ -104,35 +96,73 @@ export default function Home() {
 
   const loadTodayData = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0]
+
+    // 残件数を読み込む
     const { data } = await supabase
       .from('residuals')
       .select('*')
       .gte('recorded_at', `${today}T00:00:00`)
       .lte('recorded_at', `${today}T23:59:59`)
       .order('recorded_at', { ascending: true })
-    if (!data || data.length === 0) return
-    const { byHour, times } = buildSavedData(data)
-    setSavedData(byHour)
-    setSavedTimes(times)
-    const latestHour = Object.keys(byHour).sort().pop()
-    if (latestHour) {
-      const latest: Residuals = JSON.parse(JSON.stringify(defaultResiduals))
-      GROUPS.forEach(g => {
+
+    if (data && data.length > 0) {
+      const { byHour, times } = buildSavedData(data)
+      setSavedData(byHour)
+      setSavedTimes(times)
+      const latestHour = Object.keys(byHour).sort().pop()
+      if (latestHour) {
+        const latest: Residuals = JSON.parse(JSON.stringify(defaultResiduals))
+        GROUPS.forEach(g => {
+          CATS.forEach(cat => {
+            if (byHour[latestHour][g.id]?.[cat] !== undefined) {
+              latest[g.id][cat] = byHour[latestHour][g.id][cat]
+            }
+          })
+        })
+        setResiduals(latest)
+      }
+    }
+
+    // 人員配置を読み込む
+    const { data: staffData } = await supabase
+      .from('staff_allocation')
+      .select('*')
+      .gte('recorded_at', `${today}T00:00:00`)
+      .lte('recorded_at', `${today}T23:59:59`)
+      .order('recorded_at', { ascending: true })
+
+    if (staffData && staffData.length > 0) {
+      const byHour: SavedStaff = {}
+      staffData.forEach((row: any) => {
+        if (!row.shift_time) return
+        const hourKey = HOURS[getHourIdxForTime(row.shift_time)]
+        if (!byHour[hourKey]) {
+          byHour[hourKey] = { MH: [], 'SS/FS': [], Pack: [] }
+        }
+        if (!byHour[hourKey][row.category]) byHour[hourKey][row.category] = []
+        byHour[hourKey][row.category][row.hour_index] = row.staff_count
+      })
+      setSavedStaff(byHour)
+
+      // 最新の人員配置を反映
+      const latestStaffHour = Object.keys(byHour).sort().pop()
+      if (latestStaffHour) {
+        const newStaff: Staff = JSON.parse(JSON.stringify(defaultStaff))
         CATS.forEach(cat => {
-          if (byHour[latestHour][g.id]?.[cat] !== undefined) {
-            latest[g.id][cat] = byHour[latestHour][g.id][cat]
+          if (byHour[latestStaffHour][cat]) {
+            byHour[latestStaffHour][cat].forEach((val, hi) => {
+              if (val !== undefined) newStaff[cat][hi] = val
+            })
           }
         })
-      })
-      setResiduals(latest)
+        setStaff(newStaff)
+      }
     }
   }, [buildSavedData])
 
   useEffect(() => { loadTodayData() }, [loadTodayData])
 
-  // リアルタイム同期
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]
     const channel = supabase
       .channel('residuals-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'residuals' }, async () => {
@@ -145,7 +175,6 @@ export default function Home() {
     return () => { supabase.removeChannel(channel) }
   }, [loadTodayData])
 
-  // 分刻みで残件数を計算したタイムライン
   function calcTimeline() {
     const result: { [gid: string]: { [cat: string]: (number | null)[] } } = {}
     const gids = ['p1', 'p2', 'p3']
@@ -154,13 +183,10 @@ export default function Home() {
       gids.forEach(gid => { result[gid] = result[gid] || {} })
       const rows: { [gid: string]: (number | null)[] } = { p1: [], p2: [], p3: [] }
 
-      // 保存済みデータがある場合、最新の保存から計算開始
-      // 保存時刻と保存値を取得
       const sortedSavedHours = Object.keys(savedData).sort()
       const latestSavedHour = sortedSavedHours[sortedSavedHours.length - 1]
       const latestSaveTime = latestSavedHour ? savedTimes[latestSavedHour] : null
 
-      // 各グループの開始残件数（最新保存データ or 入力値）
       const startValues: { [gid: string]: number } = {}
       gids.forEach(gid => {
         if (latestSavedHour && savedData[latestSavedHour]?.[gid]?.[cat] !== undefined) {
@@ -170,16 +196,12 @@ export default function Home() {
         }
       })
 
-      // 保存時刻から現在時刻まで何分経過したか
       const saveTimeMin = latestSaveTime ? toMinutes(latestSaveTime) : toMinutes(effectiveTime)
-      const nowMin = toMinutes(effectiveTime)
 
       HOURS.forEach((h, hi) => {
-        const hMin = toMinutes(h)
         const latestSaveHourIdx = latestSavedHour ? getHourIdxForTime(latestSavedHour) : -1
 
         if (hi < latestSaveHourIdx) {
-          // 保存前の時間帯：保存済みデータがあれば表示、なければnull
           gids.forEach(gid => {
             const hourData = savedData[h]
             if (hourData?.[gid]?.[cat] !== undefined) {
@@ -192,16 +214,11 @@ export default function Home() {
         }
 
         if (hi === latestSaveHourIdx) {
-          // 保存時刻が属する時間帯：保存した値をそのまま表示
-          gids.forEach(gid => {
-            rows[gid].push(startValues[gid])
-          })
+          gids.forEach(gid => { rows[gid].push(startValues[gid]) })
           return
         }
 
-        // 保存時刻より後の時間帯：分単位で計算
-        // hi番目の時間（hMin）における残件数を計算
-        // 保存時刻(saveTimeMin)からhMinまでの経過分数
+        const hMin = toMinutes(h)
         const elapsedMin = Math.max(0, hMin - saveTimeMin)
         const staffIdx = Math.min(hi - 1, staff[cat].length - 1)
         const staffCount = staff[cat][Math.max(0, staffIdx)] || 0
@@ -210,7 +227,6 @@ export default function Home() {
         const remValues: { [gid: string]: number } = {}
         gids.forEach(gid => { remValues[gid] = startValues[gid] })
 
-        // 優先順位付きで処理
         let totalProcessed = elapsedMin * throughputPerMin
         for (const gid of gids) {
           const consume = Math.min(remValues[gid], totalProcessed)
@@ -241,10 +257,25 @@ export default function Home() {
     return times.reduce((a, b) => a > b ? a : b)
   }
 
-  // セルが保存済みかどうか
   function isSavedCell(hi: number): boolean {
-    const hour = HOURS[hi]
-    return !!savedData[hour]
+    return !!savedData[HOURS[hi]]
+  }
+
+  // 人員配置セルが保存済みかどうか
+  function isSavedStaffCell(hi: number): boolean {
+    return Object.values(savedStaff).some(hourData => {
+      return CATS.some(cat => hourData[cat]?.[hi] !== undefined)
+    })
+  }
+
+  // 保存済み人員配置の最新値を返す
+  function getSavedStaffValue(cat: string, hi: number): number | null {
+    const sortedHours = Object.keys(savedStaff).sort()
+    for (let i = sortedHours.length - 1; i >= 0; i--) {
+      const val = savedStaff[sortedHours[i]]?.[cat]?.[hi]
+      if (val !== undefined) return val
+    }
+    return null
   }
 
   async function handleSave() {
@@ -259,8 +290,10 @@ export default function Home() {
       }))
     )
     await supabase.from('residuals').insert(rows)
+
     const staffRows = CATS.flatMap(cat =>
       staff[cat].map((count, hi) => ({
+        shift_time: saveTime,
         category: cat,
         hour_index: hi,
         staff_count: count,
@@ -285,6 +318,7 @@ export default function Home() {
     setStaff(JSON.parse(JSON.stringify(defaultStaff)))
     setCap({ ...defaultCap })
     setSavedData({})
+    setSavedStaff({})
     setSavedTimes({})
     setManualTime(null)
     setResetting(false)
@@ -319,7 +353,6 @@ export default function Home() {
 
       <div className="grid grid-cols-[280px_1fr] gap-4 items-start">
         <div className="flex flex-col gap-3">
-
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="text-sm text-gray-500 mb-2">🕐 現在時刻</div>
             <div className="text-xl font-medium text-center mb-2">{currentTime}</div>
@@ -389,12 +422,13 @@ export default function Home() {
           <div className="grid grid-cols-3 gap-3">
             {GROUPS.map(g => {
               const summaryTime = getSummaryTime(timeline, g.id)
+              const isTomorrow = summaryTime === 'Tomorrow'
               return (
                 <div key={g.id} className={`rounded-xl border-2 p-4 ${g.bg} ${g.border}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className={`font-medium text-sm ${g.text}`}>{g.label}</span>
                     <div className="flex items-center gap-1">
-                      {summaryTime !== 'Tomorrow' ? <span className="text-green-500 text-lg">✓</span> : <span className="text-yellow-500">🕐</span>}
+                      {!isTomorrow ? <span className="text-green-500 text-lg">✓</span> : <span className="text-yellow-500">🕐</span>}
                       <span className={`text-sm font-medium ${g.text}`}>{summaryTime}</span>
                     </div>
                   </div>
@@ -405,9 +439,9 @@ export default function Home() {
                       <span className="font-medium">{residuals[g.id][cat]}件</span>
                     </div>
                   ))}
-                  {(g.id === 'p3' || getSummaryTime(timeline, g.id) === 'Tomorrow') && (
+                  {isTomorrow && (
                     <>
-                      <div className="text-xs text-gray-500 mt-2 mb-1 pt-2 border-t border-blue-100">21:00時点の予測残件数</div>
+                      <div className="text-xs text-gray-500 mt-2 mb-1 pt-2 border-t border-gray-200">21:00時点の予測残件数</div>
                       {CATS.map(cat => (
                         <div key={cat} className="flex justify-between text-sm py-0.5">
                           <span className="text-gray-500">{cat}</span>
@@ -447,18 +481,14 @@ export default function Home() {
                     <tr key={`${g.id}-${cat}`} className={g.rowbg}>
                       <td className={`py-1.5 px-2 font-medium text-sm ${g.text}`}>{g.label} {cat}</td>
                       {timeline[g.id][cat].map((val, i) => {
-                        const isNull = val === null
                         const isSaved = isSavedCell(i)
-                        const isZero = val === 0
                         return (
                           <td key={i} className={`py-1.5 px-2 text-center text-sm ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
-                            {isNull ? '' : (
+                            {val === null ? '' : (
                               <span className={
-                                isZero
-                                  ? 'text-green-600 font-medium'
-                                  : isSaved
-                                  ? 'text-blue-600 font-medium'
-                                  : 'text-gray-700'
+                                val === 0 ? 'text-green-600 font-medium'
+                                : isSaved ? 'text-blue-600 font-medium'
+                                : 'text-gray-700'
                               }>
                                 {val}
                               </span>
@@ -474,7 +504,8 @@ export default function Home() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="font-medium text-base mb-3">人員配置</div>
+            <div className="font-medium text-base mb-1">人員配置</div>
+            <div className="text-xs text-blue-500 mb-3">青字＝保存済み　<span className="text-gray-400">黒字＝未保存</span></div>
             <div className="overflow-x-auto">
               <table className="text-sm w-full border-collapse">
                 <thead>
@@ -489,21 +520,28 @@ export default function Home() {
                   {CATS.map(cat => (
                     <tr key={cat}>
                       <td className="py-1.5 px-2 font-medium text-sm text-gray-600">{cat}</td>
-                      {staff[cat].map((val, hi) => (
-                        <td key={hi} className={`py-1 px-1 text-center ${hi === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
-                          <input
-                            type="number" min={0} max={99}
-                            className={`w-12 border rounded px-1 py-1 text-center text-sm ${hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}
-                            value={val}
-                            onFocus={e => e.target.select()}
-                            onChange={e => setStaff(prev => {
-                              const updated = [...prev[cat]]
-                              updated[hi] = parseInt(e.target.value) || 0
-                              return { ...prev, [cat]: updated }
-                            })}
-                          />
-                        </td>
-                      ))}
+                      {staff[cat].map((val, hi) => {
+                        const savedVal = getSavedStaffValue(cat, hi)
+                        const isSaved = savedVal !== null
+                        return (
+                          <td key={hi} className={`py-1 px-1 text-center ${hi === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
+                            <input
+                              type="number" min={0} max={99}
+                              className={`w-12 border rounded px-1 py-1 text-center text-sm font-medium
+                                ${hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}
+                                ${isSaved ? 'text-blue-600' : 'text-gray-700'}
+                              `}
+                              value={val}
+                              onFocus={e => e.target.select()}
+                              onChange={e => setStaff(prev => {
+                                const updated = [...prev[cat]]
+                                updated[hi] = parseInt(e.target.value) || 0
+                                return { ...prev, [cat]: updated }
+                              })}
+                            />
+                          </td>
+                        )
+                      })}
                     </tr>
                   ))}
                 </tbody>
