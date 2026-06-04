@@ -511,26 +511,30 @@ export default function Home() {
                         const isSaved = isStaffSaved(hi)
                         return (
                           <td key={hi} className={`py-1 px-1 text-center ${hi === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
-                            <input
-                              type="number" min={0} max={99}
-                              disabled={isPast}
-                              className={`w-12 border rounded px-1 py-1 text-center text-sm font-medium
-                                ${isPast ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed' :
-                                  isSaved ? 'border-blue-200 text-blue-600' :
-                                  hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50 text-gray-700' :
-                                  'border-gray-200 text-gray-700'}
-                              `}
-                              value={val}
-                              onFocus={e => !isPast && e.target.select()}
-                              onChange={e => {
-                                if (isPast) return
-                                setStaff(prev => {
-                                  const updated = [...prev[cat]]
-                                  updated[hi] = parseInt(e.target.value) || 0
-                                  return { ...prev, [cat]: updated }
-                                })
-                              }}
-                            />
+                            {isPast && !isSaved ? (
+                              <span className="text-gray-300">—</span>
+                            ) : (
+                              <input
+                                type="number" min={0} max={99}
+                                disabled={isPast}
+                                className={`w-12 border rounded px-1 py-1 text-center text-sm font-medium
+                                  ${isPast ? 'bg-gray-50 border-gray-100 text-blue-600' :
+                                    isSaved ? 'border-blue-200 text-blue-600' :
+                                    hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50 text-gray-700' :
+                                    'border-gray-200 text-gray-700'}
+                                `}
+                                value={val}
+                                onFocus={e => !isPast && e.target.select()}
+                                onChange={e => {
+                                  if (isPast) return
+                                  setStaff(prev => {
+                                    const updated = [...prev[cat]]
+                                    updated[hi] = parseInt(e.target.value) || 0
+                                    return { ...prev, [cat]: updated }
+                                  })
+                                }}
+                              />
+                            )}
                           </td>
                         )
                       })}
