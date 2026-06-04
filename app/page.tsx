@@ -28,7 +28,7 @@ const defaultStaff: Staff = {
   Pack:    [0,6,6,6,6,6,6,6,6,3,3,3,3],
 }
 
-const defaultCap: { [cat: string]: number } = { MH: 20, 'SS/FS': 30, Pack: 7 }
+const defaultCap: { [cat: string]: number } = { MH: 20, 'SS/FS': 20, Pack: 7 }
 
 function getCurrentTime(): string {
   const now = new Date()
@@ -405,7 +405,7 @@ export default function Home() {
                       <span className="font-medium">{residuals[g.id][cat]}件</span>
                     </div>
                   ))}
-                  {g.id === 'p3' && (
+                  {(g.id === 'p3' || getSummaryTime(timeline, g.id) === 'Tomorrow') && (
                     <>
                       <div className="text-xs text-gray-500 mt-2 mb-1 pt-2 border-t border-blue-100">21:00時点の予測残件数</div>
                       {CATS.map(cat => (
