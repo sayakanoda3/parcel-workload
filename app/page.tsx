@@ -38,7 +38,7 @@ function getCurrentTime(): string {
 
 function getCurrentHourIdx(): number {
   const now = new Date()
-  const h = Math.max(8, Math.min(20, now.getHours()))
+  const h = Math.max(8, Math.min(21, now.getHours()))
   return HOURS.indexOf(h.toString().padStart(2, '0') + ':00')
 }
 
@@ -49,7 +49,7 @@ function toMinutes(timeStr: string): number {
 
 function getHourIdxForTime(timeStr: string): number {
   const h = parseInt(timeStr.split(':')[0])
-  const clamped = Math.max(8, Math.min(20, h))
+  const clamped = Math.max(8, Math.min(21, h))
   return HOURS.indexOf(clamped.toString().padStart(2, '0') + ':00')
 }
 
