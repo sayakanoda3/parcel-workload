@@ -24,12 +24,12 @@ const defaultResiduals: Residuals = {
 }
 
 const defaultStaff: Staff = {
-  MH:      [2,4,4,4,4,4,4,3,3,3,3,1,1],
-  'SS/FS': [0,2,2,2,2,2,2,1,1,1,1,1,1],
-  Pack:    [0,6,6,6,6,6,6,6,6,3,3,3,3],
+  MH:      [2,4,4,4,4,2,4,4,4,3,3,1,1],
+  'SS/FS': [0,2,2,2,2,0,1,1,1,0,0,0,0],
+  Pack:    [0,6,6,6,6,2,6,6,6,3,3,2,2],
 }
 
-const defaultCap: { [cat: string]: number } = { MH: 20, 'SS/FS': 20, Pack: 7 }
+const defaultCap: { [cat: string]: number } = { MH: 40, 'SS/FS': 30, Pack: 7 }
 
 function getCurrentTime(): string {
   const now = new Date()
@@ -369,14 +369,17 @@ export default function Home() {
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="text-sm text-gray-500 mb-2">🕐 現在時刻</div>
             <div className="text-xl font-medium text-center mb-2">{currentTime}</div>
-            <div className="text-xs text-gray-400 mb-1">手動で時刻を変更</div>
-            <select
+            <div className="text-xs text-gray-400 mb-1">手動で時刻を変更（例：14:30）</div>
+            <input
+              type="text"
+              placeholder="HH:MM"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              value={manualTime ?? HOURS[curIdx]}
-              onChange={e => setManualTime(e.target.value)}
-            >
-              {HOURS.slice(0, -1).map(h => <option key={h}>{h}</option>)}
-            </select>
+              value={manualTime ?? ''}
+              onChange={e => {
+                const val = e.target.value
+                setManualTime(val === '' ? null : val)
+              }}
+            />
             {manualTime !== null && (
               <button onClick={() => setManualTime(null)} className="mt-2 w-full text-xs text-blue-500 border border-blue-200 rounded-lg py-1 hover:bg-blue-50">
                 現在時刻に戻す
@@ -472,7 +475,7 @@ export default function Home() {
 
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="font-medium text-base mb-1">時間別推移テーブル</div>
-            <div className="text-xs mb-3"><span className="text-blue-500">青字＝保存済み</span><span className="text-gray-400 ml-2">黒字＝予測</span></div>
+            <div className="text-xs mb-3"><span className="text-gray-700">黒字＝保存済み</span><span className="text-blue-500 ml-2">青字＝予測</span></div>
             <div className="overflow-x-auto">
               <table className="text-sm w-full border-collapse">
                 <thead>
@@ -495,8 +498,8 @@ export default function Home() {
                           {val === null ? '' : (
                             <span className={
                               val === 0 ? 'text-green-600 font-medium'
-                              : isSavedCell(i) ? 'text-blue-600 font-medium'
-                              : 'text-gray-700'
+                              : isSavedCell(i) ? 'text-gray-700 font-medium'
+                              : 'text-blue-500'
                             }>
                               {val}
                             </span>
