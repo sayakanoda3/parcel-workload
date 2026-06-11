@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00']
-const STAFF_HOURS = HOURS.slice(0, 13)
+const STAFF_HOURS = HOURS
 const CATS = ['MH', 'SS/FS', 'Pack']
 const GROUPS = [
   { id: 'p1', label: '+1', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', rowbg: 'bg-red-50/40' },
@@ -24,9 +24,9 @@ const defaultResiduals: Residuals = {
 }
 
 const defaultStaff: Staff = {
-  MH:      [2,4,4,4,4,2,4,4,4,4,3,1,1],
-  'SS/FS': [0,2,2,2,2,0,1,1,1,1,0,0,0],
-  Pack:    [0,6,6,6,6,2,6,6,6,6,3,2,2],
+  MH:      [2,4,4,4,4,2,4,4,4,4,3,1,1,0],
+  'SS/FS': [0,2,2,2,2,0,1,1,1,1,0,0,0,0],
+  Pack:    [0,6,6,6,6,2,6,6,6,6,3,2,2,0],
 }
 
 const defaultCap: { [cat: string]: number } = { MH: 40, 'SS/FS': 30, Pack: 7 }
@@ -371,7 +371,7 @@ export default function Home() {
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="text-sm text-gray-500 mb-2">🕐 現在時刻</div>
             <div className="text-xl font-medium text-center mb-2">{currentTime}</div>
-            <div className="text-xs text-gray-400 mb-1">手動で時刻を変更（例：14:30）</div>
+            <div className="text-xs text-gray-400 mb-1">手動で時刻を変更（例：14:30 ※半角）</div>
             <input
               type="text"
               placeholder="HH:MM"
@@ -534,6 +534,7 @@ export default function Home() {
                       {staff[cat].map((val, hi) => {
                         const isPast = isStaffPast(hi)
                         const isSaved = isStaffSaved(hi)
+                        const isLast = hi === HOURS.length - 1
                         return (
                           <td key={hi} className={`py-1 px-1 text-center ${hi === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
                             {isPast && !isSaved ? (
@@ -543,10 +544,10 @@ export default function Home() {
                                 type="number" min={0} max={99}
                                 disabled={isPast}
                                 className={`w-12 border rounded px-1 py-1 text-center text-sm font-medium
-                                  ${isPast ? 'bg-gray-50 border-gray-100 text-blue-600' :
-                                    isSaved ? 'border-blue-200 text-blue-600' :
-                                    hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50 text-gray-700' :
-                                    'border-gray-200 text-gray-700'}
+                                  ${isPast ? 'bg-gray-50 border-gray-100 text-gray-700' :
+                                    isSaved ? 'border-gray-200 text-gray-700' :
+                                    hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50 text-blue-500' :
+                                    'border-gray-200 text-blue-500'}
                                 `}
                                 value={val}
                                 onFocus={e => !isPast && e.target.select()}
