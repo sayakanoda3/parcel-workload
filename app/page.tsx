@@ -238,7 +238,9 @@ export default function Home() {
           const stepEnd = toMinutes(HOURS[step + 1])
           const minutes = Math.max(0, stepEnd - stepStart)
 
-          const staffCount = staff[cat][Math.min(step, staff[cat].length - 1)] || 0
+          // step番目の時間帯の人員数を使う（例：13:00→14:00の処理には13:00の人員数）
+          const staffIdx = STAFF_HOURS.indexOf(stepHour)
+          const staffCount = staffIdx >= 0 ? (staff[cat][staffIdx] || 0) : 0
           const processed = (staffCount * cap[cat] / 60) * minutes
 
           let remaining = Math.max(0, processed)
@@ -388,7 +390,7 @@ export default function Home() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-sm text-gray-500 mb-2">⚡ 推定能力（件/時間）</div>
+            <div className="text-sm text-gray-500 mb-2">⚡ 推定能力（MH・SS/FS：orderlines/h、Pack：件/h）</div>
             <div className="grid grid-cols-3 gap-2">
               {CATS.map(cat => (
                 <div key={cat}>
