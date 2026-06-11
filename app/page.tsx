@@ -24,9 +24,9 @@ const defaultResiduals: Residuals = {
 }
 
 const defaultStaff: Staff = {
-  MH:      [2,4,4,4,4,2,4,4,4,3,3,1,1],
-  'SS/FS': [0,2,2,2,2,0,1,1,1,0,0,0,0],
-  Pack:    [0,6,6,6,6,2,6,6,6,3,3,2,2],
+  MH:      [2,4,4,4,4,2,4,4,4,4,3,1,1],
+  'SS/FS': [0,2,2,2,2,0,1,1,1,1,0,0,0],
+  Pack:    [0,6,6,6,6,2,6,6,6,6,3,2,2],
 }
 
 const defaultCap: { [cat: string]: number } = { MH: 40, 'SS/FS': 30, Pack: 7 }
@@ -418,7 +418,7 @@ export default function Home() {
                 <div className={`text-sm font-medium px-2 py-1 rounded mb-2 ${g.bg} ${g.text}`}>{g.label}</div>
                 {CATS.map(cat => (
                   <div key={cat} className="mb-2">
-                    <div className="text-sm text-gray-500 mb-1">{cat}残件数</div>
+                    <div className="text-sm text-gray-500 mb-1">{cat}{cat === 'Pack' ? '(件)' : '(orderlines)'}</div>
                     <input
                       type="number" min={0}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
@@ -454,7 +454,7 @@ export default function Home() {
                   {CATS.map(cat => (
                     <div key={cat} className="flex justify-between text-sm py-0.5">
                       <span className="text-gray-500">{cat}</span>
-                      <span className="font-medium">{residuals[g.id][cat]}件</span>
+                      <span className="font-medium">{residuals[g.id][cat]}{cat === 'Pack' ? '件' : 'OL'}</span>
                     </div>
                   ))}
                   {isTomorrow && (
@@ -464,7 +464,7 @@ export default function Home() {
                         <div key={cat} className="flex justify-between text-sm py-0.5">
                           <span className="text-gray-500">{cat}</span>
                           <span className={`font-medium ${(timeline[g.id][cat][HOURS.length - 1] ?? 0) > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                            {timeline[g.id][cat][HOURS.length - 1] ?? 0}件
+                            {timeline[g.id][cat][HOURS.length - 1] ?? 0}{cat === 'Pack' ? '件' : 'OL'}
                           </span>
                         </div>
                       ))}
