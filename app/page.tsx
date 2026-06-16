@@ -446,8 +446,19 @@ export default function Home() {
                   <div className="flex items-center justify-between mb-2">
                     <span className={`font-medium text-sm ${g.text}`}>{g.label}</span>
                     <div className="flex items-center gap-1">
-                      {!isTomorrow ? <span className="text-green-500 text-lg">✓</span> : <span className="text-yellow-500">🕐</span>}
-                      <span className={`text-sm font-medium ${g.text}`}>{summaryTime}</span>
+                      {!isTomorrow ? (
+                        <>
+                          <span className="text-green-500 text-lg">✓</span>
+                          {HOURS.indexOf(summaryTime) > effectiveCurIdx && (
+                            <span className={`text-sm font-medium ${g.text}`}>{summaryTime}</span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-yellow-500">🕐</span>
+                          <span className={`text-sm font-medium ${g.text}`}>{summaryTime}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="text-xs text-gray-500 mb-1">現在の残件数</div>
