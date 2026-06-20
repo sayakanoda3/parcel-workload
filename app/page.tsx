@@ -497,7 +497,7 @@ export default function Home() {
               <tr>
                 <th className="text-left py-2 px-2 text-gray-400 font-normal" style={{width: '90px'}}></th>
                 {HOURS.map((h, i) => (
-                  <th key={h} className={`py-1 px-2 text-center font-normal ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '95px'}}>
+                  <th key={h} className={`py-1 px-2 text-center font-normal text-base ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '95px'}}>
                     <div>{h}</div>
                     {savedTimes[h] && <div className="text-xs text-blue-400">{savedTimes[h]}</div>}
                   </th>
@@ -509,7 +509,7 @@ export default function Home() {
                 <tr key={`${g.id}-${cat}`} className={g.rowbg}>
                   <td className={`py-2 px-2 font-medium text-base ${g.text}`}>{g.label} {cat}</td>
                   {timeline[g.id][cat].map((val, i) => (
-                    <td key={i} className={`py-2 px-2 text-center text-base ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
+                    <td key={i} className={`py-2 px-2 text-center ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`} style={{fontSize: '18px'}}>
                       {val === null ? '' : (
                         <span className={
                           val === 0 ? 'text-green-600 font-semibold'
@@ -559,13 +559,14 @@ export default function Home() {
                           <input
                             type="number" min={0} max={99}
                             disabled={isPast}
-                            className={`w-12 border rounded px-1 py-1.5 text-center text-base font-medium
+                            className={`w-14 border rounded px-1 py-1.5 text-center font-medium
                               ${isPast ? 'bg-gray-50 border-gray-100 text-gray-700' :
                                 isSaved ? 'border-gray-200 text-gray-700' :
                                 hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50 text-blue-500' :
                                 'border-gray-200 text-blue-500'}
                             `}
                             value={val}
+                            style={{fontSize: '17px'}}
                             onFocus={e => !isPast && e.target.select()}
                             onChange={e => {
                               if (isPast) return
