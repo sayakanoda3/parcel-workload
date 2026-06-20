@@ -507,14 +507,14 @@ export default function Home() {
             <tbody>
               {GROUPS.map(g => CATS.map(cat => (
                 <tr key={`${g.id}-${cat}`} className={g.rowbg}>
-                  <td className={`py-1.5 px-2 font-medium text-sm ${g.text}`}>{g.label} {cat}</td>
+                  <td className={`py-2 px-2 font-medium text-base ${g.text}`}>{g.label} {cat}</td>
                   {timeline[g.id][cat].map((val, i) => (
-                    <td key={i} className={`py-1.5 px-2 text-center text-sm ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
+                    <td key={i} className={`py-2 px-2 text-center text-base ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
                       {val === null ? '' : (
                         <span className={
-                          val === 0 ? 'text-green-600 font-medium'
-                          : isSavedCell(i) ? 'text-gray-700 font-medium'
-                          : 'text-blue-500'
+                          val === 0 ? 'text-green-600 font-semibold'
+                          : isSavedCell(i) ? 'text-gray-700 font-semibold'
+                          : 'text-blue-500 font-medium'
                         }>
                           {val}
                         </span>
@@ -544,7 +544,7 @@ export default function Home() {
             <tbody>
               {CATS.map(cat => (
                 <tr key={cat}>
-                  <td className="py-1.5 px-2 font-medium text-sm text-gray-600">{cat}</td>
+                  <td className="py-2 px-2 font-medium text-base text-gray-600">{cat}</td>
                   {staff[cat].map((val, hi) => {
                     const isPast = isStaffPast(hi)
                     const isSaved = isStaffSaved(hi)
@@ -559,7 +559,7 @@ export default function Home() {
                           <input
                             type="number" min={0} max={99}
                             disabled={isPast}
-                            className={`w-12 border rounded px-1 py-1 text-center text-sm font-medium
+                            className={`w-14 border rounded px-1 py-1.5 text-center text-base font-medium
                               ${isPast ? 'bg-gray-50 border-gray-100 text-gray-700' :
                                 isSaved ? 'border-gray-200 text-gray-700' :
                                 hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50 text-blue-500' :
