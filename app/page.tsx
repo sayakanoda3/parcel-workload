@@ -333,7 +333,7 @@ export default function Home() {
   const timeline = calcTimeline()
 
   return (
-    <main className="p-6 max-w-screen-xl mx-auto text-lg">
+    <main className="p-6 max-w-screen-xl mx-auto" style={{fontSize: '17px'}}>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-medium">Parcel Workload</h1>
         <button onClick={() => setShowResetConfirm(true)} className="text-sm text-red-500 border border-red-200 px-4 py-1.5 rounded-lg hover:bg-red-50">
