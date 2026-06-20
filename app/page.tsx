@@ -48,8 +48,9 @@ function toMinutes(timeStr: string): number {
 }
 
 function getHourIdxForTime(timeStr: string): number {
-  const h = parseInt(timeStr.split(':')[0])
-  const clamped = Math.max(8, Math.min(21, h))
+  const [h, m] = timeStr.split(':').map(Number)
+  const roundedH = m >= 30 ? h + 1 : h
+  const clamped = Math.max(8, Math.min(21, roundedH))
   return HOURS.indexOf(clamped.toString().padStart(2, '0') + ':00')
 }
 
