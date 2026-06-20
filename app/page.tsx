@@ -333,7 +333,7 @@ export default function Home() {
   const timeline = calcTimeline()
 
   return (
-    <main className="p-6 max-w-screen-xl mx-auto text-base">
+    <main className="p-6 max-w-screen-xl mx-auto text-lg">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-medium">Parcel Workload</h1>
         <button onClick={() => setShowResetConfirm(true)} className="text-sm text-red-500 border border-red-200 px-4 py-1.5 rounded-lg hover:bg-red-50">
@@ -461,16 +461,16 @@ export default function Home() {
         })}
 
         {/* 推定能力 + 入力ボタン */}
-        <div className="flex flex-col gap-2">
-          <div className="bg-white border border-gray-200 rounded-xl p-3">
-            <div className="text-xs text-gray-500 mb-2">⚡ 推定能力</div>
-            <div className="grid grid-cols-3 gap-1.5">
+        <div className="flex flex-col gap-3 h-full">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex-1 flex flex-col justify-center">
+            <div className="text-sm text-gray-500 mb-3">⚡ 推定能力</div>
+            <div className="grid grid-cols-3 gap-2">
               {CATS.map(cat => (
                 <div key={cat} className="text-center">
-                  <div className="text-[10px] text-gray-400 mb-1">{cat}</div>
+                  <div className="text-xs text-gray-400 mb-1">{cat}</div>
                   <input
                     type="number" min={1}
-                    className="w-full border border-gray-200 rounded px-1 py-1 text-xs text-center"
+                    className="w-full border border-gray-200 rounded-lg px-1 py-2 text-sm text-center"
                     value={cap[cat]}
                     onChange={e => setCap(prev => ({ ...prev, [cat]: parseInt(e.target.value) || 1 }))}
                   />
@@ -480,7 +480,7 @@ export default function Home() {
           </div>
           <button
             onClick={() => setShowInputPopup(true)}
-            className="bg-blue-600 text-white text-sm py-2.5 rounded-xl hover:bg-blue-700 flex items-center justify-center gap-2"
+            className="bg-blue-600 text-white text-base py-4 rounded-xl hover:bg-blue-700 flex items-center justify-center gap-2 flex-1"
           >
             📦 残件数を入力
           </button>
@@ -495,9 +495,9 @@ export default function Home() {
           <table className="text-sm w-full border-collapse">
             <thead>
               <tr>
-                <th className="text-left py-2 px-2 text-gray-400 font-normal w-24"></th>
+                <th className="text-left py-2 px-2 text-gray-400 font-normal" style={{width: '90px'}}></th>
                 {HOURS.map((h, i) => (
-                  <th key={h} className={`py-1 px-2 text-center font-normal w-14 ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`}>
+                  <th key={h} className={`py-1 px-2 text-center font-normal ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '95px'}}>
                     <div>{h}</div>
                     {savedTimes[h] && <div className="text-xs text-blue-400">{savedTimes[h]}</div>}
                   </th>
@@ -535,9 +535,9 @@ export default function Home() {
           <table className="text-sm w-full border-collapse">
             <thead>
               <tr>
-                <th className="text-left py-2 px-2 text-gray-400 font-normal w-16"></th>
+                <th className="text-left py-2 px-2 text-gray-400 font-normal" style={{width: '90px'}}></th>
                 {STAFF_HOURS.map((h, i) => (
-                  <th key={h} className={`py-2 px-2 text-center font-normal w-14 ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`}>{h}</th>
+                  <th key={h} className={`py-2 px-2 text-center font-normal ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '95px'}}>{h}</th>
                 ))}
               </tr>
             </thead>
