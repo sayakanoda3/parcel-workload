@@ -559,7 +559,7 @@ export default function Home() {
                           <input
                             type="number" min={0} max={99}
                             disabled={isPast}
-                            className={`w-14 border rounded px-1 py-1.5 text-center text-base font-medium
+                            className={`w-12 border rounded px-1 py-1.5 text-center text-base font-medium
                               ${isPast ? 'bg-gray-50 border-gray-100 text-gray-700' :
                                 isSaved ? 'border-gray-200 text-gray-700' :
                                 hi === effectiveCurIdx ? 'border-blue-300 bg-blue-50 text-blue-500' :
