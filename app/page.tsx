@@ -372,10 +372,9 @@ export default function Home() {
                 type="text"
                 placeholder="HH:MM"
                 className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-medium w-24 text-center"
-                value={manualTime ?? ''}
-                onChange={e => setManualTime(e.target.value === '' ? null : e.target.value)}
+                value={manualTime ?? currentTime}
+                onChange={e => setManualTime(e.target.value)}
               />
-              <span className="text-sm text-gray-400">（{currentTime}）</span>
               {manualTime !== null && (
                 <button onClick={() => setManualTime(null)} className="text-xs text-blue-500 underline ml-auto">現在時刻に戻す</button>
               )}
@@ -507,7 +506,9 @@ export default function Home() {
             <tbody>
               {GROUPS.map(g => CATS.map(cat => (
                 <tr key={`${g.id}-${cat}`} className={g.rowbg}>
-                  <td className={`py-2 px-2 font-medium text-base ${g.text}`}>{g.label} {cat}</td>
+                  <td className={`py-2 px-2 font-medium text-base whitespace-nowrap ${g.text}`} style={{width: '90px'}}>
+                    {cat === 'MH' ? `${g.label} ${cat}` : cat}
+                  </td>
                   {timeline[g.id][cat].map((val, i) => (
                     <td key={i} className={`py-2 px-2 text-center ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`} style={{fontSize: '18px'}}>
                       {val === null ? '' : (
