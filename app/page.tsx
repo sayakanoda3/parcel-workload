@@ -506,8 +506,9 @@ export default function Home() {
             <tbody>
               {GROUPS.map(g => CATS.map(cat => (
                 <tr key={`${g.id}-${cat}`} className={g.rowbg}>
-                  <td className={`py-2 px-2 font-medium text-base whitespace-nowrap ${g.text}`} style={{width: '90px'}}>
-                    {cat === 'MH' ? `${g.label} ${cat}` : cat}
+                  <td className={`py-2 px-2 font-medium text-base whitespace-nowrap ${g.text}`} style={{width: '110px'}}>
+                    <span style={{display: 'inline-block', width: '32px'}}>{cat === 'MH' ? g.label : ''}</span>
+                    <span>{cat}</span>
                   </td>
                   {timeline[g.id][cat].map((val, i) => (
                     <td key={i} className={`py-2 px-2 text-center ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`} style={{fontSize: '18px'}}>
