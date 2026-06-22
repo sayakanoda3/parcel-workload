@@ -24,9 +24,9 @@ const defaultResiduals: Residuals = {
 }
 
 const defaultStaff: Staff = {
-  MH:      [2,6,6,6,6,6,6,3,3,3,3,1,1,0],
+  MH:      [2,4,4,4,4,4,4,3,3,3,3,1,1,0],
   'SS/FS': [0,2,2,2,2,2,2,1,1,1,1,1,1,0],
-  Pack:    [0,6,6,6,6,6,6,6,6,3,3,3,3,0],
+  Pack:    [0,4,4,4,4,4,4,4,4,3,3,3,3,0],
 }
 
 const defaultCap: { [cat: string]: number } = { MH: 40, 'SS/FS': 30, Pack: 7 }
@@ -534,12 +534,12 @@ export default function Home() {
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="font-medium text-base mb-3">人員配置</div>
         <div className="overflow-x-auto">
-          <table className="text-sm w-full border-collapse">
-            <thead>
-              <tr>
-                <th className="text-left py-2 px-2 text-gray-400 font-normal" style={{width: '90px'}}></th>
-                {STAFF_HOURS.map((h, i) => (
-                  <th key={h} className={`py-2 px-2 text-center font-normal ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '95px'}}>{h}</th>
+          <table className="text-sm w-full border-collapse" style={{tableLayout: 'fixed'}}>
+                <thead>
+                  <tr>
+                    <th className="text-left py-2 px-2 text-gray-400 font-normal" style={{width: '110px'}}></th>
+                    {HOURS.map((h, i) => (
+                      <th key={h} className={`py-1 px-2 text-center font-normal text-base ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '95px'}}>{h}</th>
                 ))}
               </tr>
             </thead>
