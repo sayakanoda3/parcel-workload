@@ -534,12 +534,12 @@ export default function Home() {
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="font-medium text-base mb-3">人員配置</div>
         <div className="overflow-x-auto">
-          <table className="text-sm w-full border-collapse" style={{tableLayout: 'fixed'}}>
+          <table className="w-full border-collapse" style={{tableLayout: 'fixed', fontSize: '13px'}}>
                 <thead>
                   <tr>
-                    <th className="text-left py-2 px-2 text-gray-400 font-normal" style={{width: '80px'}}></th>
+                    <th className="text-left py-2 px-1 text-gray-400 font-normal" style={{width: '6%'}}></th>
                     {HOURS.map((h, i) => (
-                      <th key={h} className={`py-1 px-1 text-center font-normal text-sm ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '52px'}}>{h}</th>
+                      <th key={h} className={`py-1 px-0 text-center font-normal ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '6.7%'}}>{h}</th>
                 ))}
               </tr>
             </thead>
