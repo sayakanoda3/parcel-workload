@@ -491,7 +491,7 @@ export default function Home() {
         <div className="font-medium text-base mb-1">時間別推移テーブル</div>
         <div className="text-xs mb-3"><span className="text-gray-700">黒字＝保存済み</span><span className="text-blue-500 ml-2">青字＝予測</span></div>
         <div className="overflow-x-auto">
-          <table className="text-sm w-full border-collapse">
+          <table className="text-sm w-full border-collapse" style={{tableLayout: 'fixed'}}>
             <thead>
               <tr>
                 <th className="text-left py-2 px-2 text-gray-400 font-normal" style={{width: '90px'}}></th>
