@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 
 const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00']
 const STAFF_HOURS = HOURS
-const CATS = ['MH', 'SS/FS', 'Pack']
+const CATS = ['MH', 'SS/FS', 'Pack', 'PUP pick', 'PUP pack']
 const GROUPS = [
   { id: 'p1', label: '+1', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', rowbg: 'bg-red-50/40' },
   { id: 'p2', label: '+2', bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', rowbg: 'bg-yellow-50/40' },
@@ -18,18 +18,20 @@ type SavedData = { [hourKey: string]: { [gid: string]: { [cat: string]: number }
 type SavedStaff = { [hourKey: string]: { [cat: string]: number[] } }
 
 const defaultResiduals: Residuals = {
-  p1: { MH: 0, 'SS/FS': 0, Pack: 0 },
-  p2: { MH: 0, 'SS/FS': 0, Pack: 0 },
-  p3: { MH: 0, 'SS/FS': 0, Pack: 0 },
+  p1: { MH: 0, 'SS/FS': 0, Pack: 0, 'PUP pick': 0, 'PUP pack': 0 },
+  p2: { MH: 0, 'SS/FS': 0, Pack: 0, 'PUP pick': 0, 'PUP pack': 0 },
+  p3: { MH: 0, 'SS/FS': 0, Pack: 0, 'PUP pick': 0, 'PUP pack': 0 },
 }
 
 const defaultStaff: Staff = {
-  MH:      [2,4,4,4,4,4,4,3,3,3,3,1,1,0],
-  'SS/FS': [0,2,2,2,2,2,2,1,1,1,1,1,1,0],
-  Pack:    [0,4,4,4,4,4,4,4,4,3,3,3,3,0],
+  MH:          [2,6,6,6,6,6,6,3,3,3,3,1,1,0],
+  'SS/FS':     [0,2,2,2,2,2,2,1,1,1,1,1,1,0],
+  Pack:        [0,6,6,6,6,6,6,6,6,3,3,3,3,0],
+  'PUP pick':  [0,2,2,2,2,2,2,2,2,1,1,1,1,0],
+  'PUP pack':  [0,2,2,2,2,2,2,2,2,1,1,1,1,0],
 }
 
-const defaultCap: { [cat: string]: number } = { MH: 40, 'SS/FS': 30, Pack: 7 }
+const defaultCap: { [cat: string]: number } = { MH: 40, 'SS/FS': 30, Pack: 7, 'PUP pick': 7, 'PUP pack': 7 }
 
 function getCurrentTime(): string {
   const now = new Date()
@@ -102,7 +104,6 @@ export default function Home() {
 
   const loadTodayData = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0]
-
     const { data } = await supabase
       .from('residuals')
       .select('*')
@@ -140,12 +141,11 @@ export default function Home() {
       staffData.forEach((row: any) => {
         if (!row.shift_time) return
         const hourKey = HOURS[getHourIdxForTime(row.shift_time)]
-        if (!byHour[hourKey]) byHour[hourKey] = { MH: [], 'SS/FS': [], Pack: [] }
+        if (!byHour[hourKey]) byHour[hourKey] = { MH: [], 'SS/FS': [], Pack: [], 'PUP pick': [], 'PUP pack': [] }
         if (!byHour[hourKey][row.category]) byHour[hourKey][row.category] = []
         byHour[hourKey][row.category][row.hour_index] = row.staff_count
       })
       setSavedStaff(byHour)
-
       const latestStaffHour = Object.keys(byHour).sort().pop()
       if (latestStaffHour) {
         const newStaff: Staff = JSON.parse(JSON.stringify(defaultStaff))
@@ -173,6 +173,8 @@ export default function Home() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [loadTodayData])
+
+  const effectiveCap = (cat: string) => cat === 'PUP pack' ? cap['Pack'] : cap[cat]
 
   function calcTimeline() {
     const result: { [gid: string]: { [cat: string]: (number | null)[] } } = {}
@@ -206,17 +208,14 @@ export default function Home() {
           })
           return
         }
-
         if (hi === latestSaveHourIdx) {
           gids.forEach(gid => { rows[gid].push(startValues[gid]) })
           return
         }
-
         if (latestSaveHourIdx === -1 && hi < effectiveCurIdx) {
           gids.forEach(gid => { rows[gid].push(null) })
           return
         }
-
         if (latestSaveHourIdx === -1 && hi === effectiveCurIdx) {
           gids.forEach(gid => { rows[gid].push(residuals[gid][cat]) })
           return
@@ -230,11 +229,9 @@ export default function Home() {
           const stepStart = step === latestSaveHourIdx ? saveTimeMin : toMinutes(stepHour)
           const stepEnd = toMinutes(HOURS[step + 1])
           const minutes = Math.max(0, stepEnd - stepStart)
-
           const staffIdx = STAFF_HOURS.indexOf(stepHour)
           const staffCount = staffIdx >= 0 ? (staff[cat][staffIdx] || 0) : 0
-          const processed = (staffCount * cap[cat] / 60) * minutes
-
+          const processed = (staffCount * effectiveCap(cat) / 60) * minutes
           let remaining = Math.max(0, processed)
           for (const gid of gids) {
             const consume = Math.min(Math.max(0, remValues[gid]), remaining)
@@ -242,13 +239,11 @@ export default function Home() {
             remaining = Math.max(0, remaining - consume)
           }
         }
-
         gids.forEach(gid => rows[gid].push(Math.max(0, Math.round(remValues[gid]))))
       })
 
       gids.forEach(gid => { result[gid][cat] = rows[gid] })
     })
-
     return result
   }
 
@@ -278,10 +273,19 @@ export default function Home() {
     return hi < lastSavedHourIdx
   }
 
+  function catLabel(cat: string): string {
+    if (cat === 'MH') return 'MH(orderlines)'
+    if (cat === 'SS/FS') return 'SS/FS(orderlines)'
+    return `${cat}(件)`
+  }
+
+  function catUnit(cat: string): string {
+    return cat === 'MH' || cat === 'SS/FS' ? 'OL' : '件'
+  }
+
   async function handleSave() {
     setSaving(true)
     const saveTime = effectiveTime
-
     const rows = GROUPS.flatMap(g =>
       CATS.map(cat => ({
         shift_time: saveTime,
@@ -291,7 +295,6 @@ export default function Home() {
       }))
     )
     await supabase.from('residuals').insert(rows)
-
     const staffRows = CATS.flatMap(cat =>
       staff[cat].map((count, hi) => ({
         shift_time: saveTime,
@@ -301,7 +304,6 @@ export default function Home() {
       }))
     )
     await supabase.from('staff_allocation').insert(staffRows)
-
     setSaving(false)
     setSaved(true)
     setTimeout(() => {
@@ -356,16 +358,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* 残件数入力ポップアップ */}
       {showInputPopup && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 shadow-xl max-w-2xl w-full">
+          <div className="bg-white rounded-xl p-6 shadow-xl w-full" style={{maxWidth: '760px'}}>
             <div className="flex items-center justify-between mb-4">
-              <span className="font-medium text-base flex items-center gap-2">📦 残件数入力</span>
+              <span className="font-medium text-base">📦 残件数入力</span>
               <button onClick={() => setShowInputPopup(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
-
-            {/* 時刻編集バー */}
             <div className="bg-gray-50 rounded-lg px-4 py-3 mb-4 flex items-center gap-3">
               <span className="text-sm text-gray-500">🕐 現在時刻</span>
               <input
@@ -379,14 +378,13 @@ export default function Home() {
                 <button onClick={() => setManualTime(null)} className="text-xs text-blue-500 underline ml-auto">現在時刻に戻す</button>
               )}
             </div>
-
             <div className="grid grid-cols-3 gap-3 mb-4">
               {GROUPS.map(g => (
                 <div key={g.id}>
                   <div className={`text-sm font-medium px-2 py-1 rounded mb-2 text-center ${g.bg} ${g.text}`}>{g.label}</div>
                   {CATS.map(cat => (
                     <div key={cat} className="mb-2">
-                      <div className="text-xs text-gray-500 mb-1">{cat}{cat === 'Pack' ? '(件)' : '(orderlines)'}</div>
+                      <div className="text-xs text-gray-500 mb-1">{catLabel(cat)}</div>
                       <input
                         type="number" min={0}
                         className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm"
@@ -402,7 +400,6 @@ export default function Home() {
                 </div>
               ))}
             </div>
-
             <button onClick={handleSave} className="w-full bg-blue-600 text-white text-sm py-2.5 rounded-lg hover:bg-blue-700">
               {saving ? '保存中...' : saved ? '✓ 保存しました' : '💾 保存'}
             </button>
@@ -410,7 +407,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* 上段：3つのサマリーカード + 推定能力/入力ボタン */}
       <div className="grid grid-cols-4 gap-3 mb-4">
         {GROUPS.map(g => {
           const summaryTime = getSummaryTime(timeline, g.id)
@@ -439,7 +435,7 @@ export default function Home() {
               {CATS.map(cat => (
                 <div key={cat} className="flex justify-between text-sm py-0.5">
                   <span className="text-gray-500">{cat}</span>
-                  <span className="font-medium">{residuals[g.id][cat]}{cat === 'Pack' ? '件' : 'OL'}</span>
+                  <span className="font-medium">{residuals[g.id][cat]}{catUnit(cat)}</span>
                 </div>
               ))}
               {isTomorrow && (
@@ -449,7 +445,7 @@ export default function Home() {
                     <div key={cat} className="flex justify-between text-sm py-0.5">
                       <span className="text-gray-500">{cat}</span>
                       <span className={`font-medium ${(timeline[g.id][cat][HOURS.length - 1] ?? 0) > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                        {timeline[g.id][cat][HOURS.length - 1] ?? 0}{cat === 'Pack' ? '件' : 'OL'}
+                        {timeline[g.id][cat][HOURS.length - 1] ?? 0}{catUnit(cat)}
                       </span>
                     </div>
                   ))}
@@ -459,22 +455,32 @@ export default function Home() {
           )
         })}
 
-        {/* 推定能力 + 入力ボタン */}
         <div className="flex flex-col gap-3 h-full">
           <div className="bg-white border border-gray-200 rounded-xl p-4 flex-1 flex flex-col justify-center">
             <div className="text-sm text-gray-500 mb-3">⚡ 推定能力</div>
             <div className="grid grid-cols-3 gap-2">
-              {CATS.map(cat => (
+              {(['MH', 'SS/FS', 'Pack', 'PUP pick'] as string[]).map(cat => (
                 <div key={cat} className="text-center">
                   <div className="text-xs text-gray-400 mb-1">{cat}</div>
                   <input
                     type="number" min={1}
                     className="w-full border border-gray-200 rounded-lg px-1 py-2 text-sm text-center"
                     value={cap[cat]}
-                    onChange={e => setCap(prev => ({ ...prev, [cat]: parseInt(e.target.value) || 1 }))}
+                    onChange={e => {
+                      const val = parseInt(e.target.value) || 1
+                      setCap(prev => ({
+                        ...prev,
+                        [cat]: val,
+                        ...(cat === 'Pack' ? { 'PUP pack': val } : {})
+                      }))
+                    }}
                   />
                 </div>
               ))}
+              <div className="text-center">
+                <div className="text-xs text-gray-400 mb-1">PUP pack</div>
+                <div className="w-full border border-gray-100 rounded-lg px-1 py-2 text-sm text-center bg-gray-50 text-gray-400">{cap['Pack']}</div>
+              </div>
             </div>
           </div>
           <button
@@ -486,12 +492,11 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 下段：推移テーブル全幅 */}
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-3">
         <div className="font-medium text-base mb-1">時間別推移テーブル</div>
         <div className="text-xs mb-3"><span className="text-gray-700">黒字＝保存済み</span><span className="text-blue-500 ml-2">青字＝予測</span></div>
         <div className="overflow-x-auto">
-          <table className="text-sm w-full border-collapse" style={{tableLayout: 'fixed'}}>
+          <table className="w-full border-collapse" style={{tableLayout: 'fixed', fontSize: '13px'}}>
             <thead>
               <tr>
                 <th className="text-left py-2 px-1 text-gray-400 font-normal" style={{width: '80px'}}></th>
@@ -507,7 +512,7 @@ export default function Home() {
               {GROUPS.map(g => CATS.map(cat => (
                 <tr key={`${g.id}-${cat}`} className={g.rowbg}>
                   <td className={`py-2 px-1 font-medium text-sm whitespace-nowrap ${g.text}`} style={{width: '80px'}}>
-                    <span style={{display: 'inline-block', width: '32px'}}>{cat === 'MH' ? g.label : ''}</span>
+                    <span style={{display: 'inline-block', width: '28px'}}>{cat === 'MH' ? g.label : ''}</span>
                     <span>{cat}</span>
                   </td>
                   {timeline[g.id][cat].map((val, i) => (
@@ -530,23 +535,22 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 人員配置 */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="font-medium text-base mb-3">人員配置</div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse" style={{tableLayout: 'fixed', fontSize: '13px'}}>
-                <thead>
-                  <tr>
-                    <th className="text-left py-2 px-1 text-gray-400 font-normal" style={{width: '6%'}}></th>
-                    {HOURS.map((h, i) => (
-                      <th key={h} className={`py-1 px-0 text-center font-normal ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '6.7%'}}>{h}</th>
+            <thead>
+              <tr>
+                <th className="text-left py-2 px-1 text-gray-400 font-normal" style={{width: '80px'}}></th>
+                {STAFF_HOURS.map((h, i) => (
+                  <th key={h} className={`py-2 px-0 text-center font-normal text-sm ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '62px'}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {CATS.map(cat => (
                 <tr key={cat}>
-                  <td className="py-2 px-2 font-medium text-base text-gray-600">{cat}</td>
+                  <td className="py-2 px-1 font-medium text-sm text-gray-600 whitespace-nowrap" style={{width: '80px'}}>{cat}</td>
                   {staff[cat].map((val, hi) => {
                     const isPast = isStaffPast(hi)
                     const isSaved = isStaffSaved(hi)
@@ -568,7 +572,7 @@ export default function Home() {
                                 'border-gray-200 text-blue-500'}
                             `}
                             value={val}
-                            style={{fontSize: '17px'}}
+                            style={{fontSize: '15px'}}
                             onFocus={e => !isPast && e.target.select()}
                             onChange={e => {
                               if (isPast) return
