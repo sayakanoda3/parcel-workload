@@ -71,6 +71,7 @@ export default function Home() {
   const [savedTimes, setSavedTimes] = useState<{ [hourKey: string]: string }>({})
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showInputPopup, setShowInputPopup] = useState(false)
+  const [openGroups, setOpenGroups] = useState<{ [gid: string]: boolean }>({ p1: true, p2: true, p3: true })
 
   const effectiveCurIdx = manualTime !== null ? getHourIdxForTime(manualTime) : curIdx
   const effectiveTime = manualTime ?? currentTime
@@ -461,6 +462,27 @@ export default function Home() {
             <div className="grid grid-cols-3 gap-2">
               {(['MH', 'SS/FS', 'Pack', 'PUP pick'] as string[]).map(cat => (
                 <div key={cat} className="text-center">
+                  <div className="text-xs text-gray-400 mb-1">{cat}{cat === 'MH' || cat === 'SS/FS' ? '(OL)' : '(件)'}</div>
+                  <input
+                    type="number" min={1}
+                    className="w-full border border-gray-200 rounded-lg px-1 py-2 text-sm text-center"
+                    value={cap[cat]}
+                    onChange={e => {
+                      const val = parseInt(e.target.value) || 1
+                      setCap(prev => ({
+                        ...prev,
+                        [cat]: val,
+                        ...(cat === 'Pack' ? { 'PUP pack': val } : {})
+                      }))
+                    }}
+                  />
+                </div>
+              ))}
+              <div className="text-center">
+                <div className="text-xs text-gray-400 mb-1">PUP pack(件)</div>
+                <div className="w-full border border-gray-100 rounded-lg px-1 py-2 text-sm text-center bg-gray-50 text-gray-400">{cap['Pack']}</div>
+              </div>
+                <div key={cat} className="text-center">
                   <div className="text-xs text-gray-400 mb-1">{cat}</div>
                   <input
                     type="number" min={1}
@@ -509,8 +531,15 @@ export default function Home() {
               </tr>
             </thead>
             <tbody>
-              {GROUPS.map(g => CATS.map(cat => (
-                <tr key={`${g.id}-${cat}`} className={g.rowbg}>
+              {GROUPS.map(g => (
+                <>
+                  <tr key={`${g.id}-header`} className={`${g.rowbg} cursor-pointer`} onClick={() => setOpenGroups(prev => ({ ...prev, [g.id]: !prev[g.id] }))}>
+                    <td colSpan={HOURS.length + 1} className={`py-2 px-2 font-medium text-sm ${g.text}`}>
+                      {openGroups[g.id] ? '▼' : '▶'} {g.label}
+                    </td>
+                  </tr>
+                  {openGroups[g.id] && CATS.map(cat => (
+                    <tr key={`${g.id}-${cat}`} className={g.rowbg}>
                   <td className={`py-2 px-1 font-medium text-sm whitespace-nowrap ${g.text}`} style={{width: '80px'}}>
                     <span style={{display: 'inline-block', width: '28px'}}>{cat === 'MH' ? g.label : ''}</span>
                     <span>{cat}</span>
@@ -529,7 +558,9 @@ export default function Home() {
                     </td>
                   ))}
                 </tr>
-              )))}
+                  ))}
+                </>
+              ))}
             </tbody>
           </table>
         </div>
