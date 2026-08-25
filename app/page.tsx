@@ -489,7 +489,7 @@ export default function Home() {
                     </td>
                   </tr>
                                     {openGroups[g.id] && CATS.map(cat => (
-                    <tr key={`${g.id}-${cat}`} className={cat.startsWith('PUP') ? 'bg-gray-50/50' : g.rowbg} style={{borderBottom: '1px solid #f3f4f6'}}>
+                    <tr key={`${g.id}-${cat}`} className={cat.startsWith('PUP') ? 'bg-white' : g.rowbg} style={{borderBottom: '1px solid #f3f4f6'}}>
                       <td className={`py-2 px-1 font-medium text-sm whitespace-nowrap ${g.text}`} style={{width: '80px', borderRight: '1px solid #f0f0f0'}}>
                         <span style={{display: 'inline-block', width: '28px'}}></span>
                         <span>{cat}</span>
