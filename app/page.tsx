@@ -7,9 +7,9 @@ const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','
 const STAFF_HOURS = HOURS
 const CATS = ['MH', 'SS/FS', 'Pack', 'PUP pick', 'PUP pack']
 const GROUPS = [
-  { id: 'p1', label: '+1', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', rowbg: 'bg-red-50/40' },
-  { id: 'p2', label: '+2', bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', rowbg: 'bg-yellow-50/40' },
-  { id: 'p3', label: '+3', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', rowbg: 'bg-blue-50/40' },
+  { id: 'p1', label: '+1', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', rowbg: 'bg-red-50/40', headerBg: 'bg-red-100' },
+  { id: 'p2', label: '+2', bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', rowbg: 'bg-yellow-50/40', headerBg: 'bg-yellow-100' },
+  { id: 'p3', label: '+3', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', rowbg: 'bg-blue-50/40', headerBg: 'bg-blue-100' },
 ]
 
 type Residuals = { [gid: string]: { [cat: string]: number } }
@@ -408,112 +408,44 @@ export default function Home() {
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-3 mb-4">
-        {GROUPS.map(g => {
-          const summaryTime = getSummaryTime(timeline, g.id)
-          const isTomorrow = summaryTime === 'Tomorrow'
-          return (
-            <div key={g.id} className={`rounded-xl border-2 p-4 ${g.bg} ${g.border}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className={`font-medium text-sm ${g.text}`}>{g.label}</span>
-                <div className="flex items-center gap-1">
-                  {!isTomorrow ? (
-                    <>
-                      <span className="text-green-500 text-lg">✓</span>
-                      {HOURS.indexOf(summaryTime) > effectiveCurIdx && (
-                        <span className={`text-sm font-medium ${g.text}`}>{summaryTime}</span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-yellow-500">🕐</span>
-                      <span className={`text-sm font-medium ${g.text}`}>{summaryTime}</span>
-                    </>
-                  )}
-                </div>
+      {/* 上段：推定能力 + 入力ボタン横並び */}
+      <div className="flex gap-3 mb-4 items-stretch">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 flex-1">
+          <div className="text-sm text-gray-500 mb-3">⚡ 推定能力</div>
+          <div className="grid grid-cols-5 gap-2">
+            {(['MH', 'SS/FS', 'Pack', 'PUP pick'] as string[]).map(cat => (
+              <div key={cat} className="text-center">
+                <div className="text-xs text-gray-400 mb-1">{cat}{cat === 'MH' || cat === 'SS/FS' ? '(OL)' : '(件)'}</div>
+                <input
+                  type="number" min={1}
+                  className="w-full border border-gray-200 rounded-lg px-1 py-2 text-sm text-center"
+                  value={cap[cat]}
+                  onChange={e => {
+                    const val = parseInt(e.target.value) || 1
+                    setCap(prev => ({
+                      ...prev,
+                      [cat]: val,
+                      ...(cat === 'Pack' ? { 'PUP pack': val } : {})
+                    }))
+                  }}
+                />
               </div>
-              <div className="text-xs text-gray-500 mb-1">現在の残件数</div>
-              {CATS.map(cat => (
-                <div key={cat} className="flex justify-between text-sm py-0.5">
-                  <span className="text-gray-500">{cat}</span>
-                  <span className="font-medium">{residuals[g.id][cat]}{catUnit(cat)}</span>
-                </div>
-              ))}
-              {isTomorrow && (
-                <>
-                  <div className="text-xs text-gray-500 mt-2 mb-1 pt-2 border-t border-gray-200">21:00時点の予測残件数</div>
-                  {CATS.map(cat => (
-                    <div key={cat} className="flex justify-between text-sm py-0.5">
-                      <span className="text-gray-500">{cat}</span>
-                      <span className={`font-medium ${(timeline[g.id][cat][HOURS.length - 1] ?? 0) > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                        {timeline[g.id][cat][HOURS.length - 1] ?? 0}{catUnit(cat)}
-                      </span>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          )
-        })}
-
-        <div className="flex flex-col gap-3 h-full">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex-1 flex flex-col justify-center">
-            <div className="text-sm text-gray-500 mb-3">⚡ 推定能力</div>
-            <div className="grid grid-cols-3 gap-2">
-              {(['MH', 'SS/FS', 'Pack', 'PUP pick'] as string[]).map(cat => (
-                <div key={cat} className="text-center">
-                  <div className="text-xs text-gray-400 mb-1">{cat}{cat === 'MH' || cat === 'SS/FS' ? '(OL)' : '(件)'}</div>
-                  <input
-                    type="number" min={1}
-                    className="w-full border border-gray-200 rounded-lg px-1 py-2 text-sm text-center"
-                    value={cap[cat]}
-                    onChange={e => {
-                      const val = parseInt(e.target.value) || 1
-                      setCap(prev => ({
-                        ...prev,
-                        [cat]: val,
-                        ...(cat === 'Pack' ? { 'PUP pack': val } : {})
-                      }))
-                    }}
-                  />
-                </div>
-              ))}
-              <div className="text-center">
-                <div className="text-xs text-gray-400 mb-1">PUP pack(件)</div>
-                <div className="w-full border border-gray-100 rounded-lg px-1 py-2 text-sm text-center bg-gray-50 text-gray-400">{cap['Pack']}</div>
-              </div>
-                <div key={cat} className="text-center">
-                  <div className="text-xs text-gray-400 mb-1">{cat}</div>
-                  <input
-                    type="number" min={1}
-                    className="w-full border border-gray-200 rounded-lg px-1 py-2 text-sm text-center"
-                    value={cap[cat]}
-                    onChange={e => {
-                      const val = parseInt(e.target.value) || 1
-                      setCap(prev => ({
-                        ...prev,
-                        [cat]: val,
-                        ...(cat === 'Pack' ? { 'PUP pack': val } : {})
-                      }))
-                    }}
-                  />
-                </div>
-              ))}
-              <div className="text-center">
-                <div className="text-xs text-gray-400 mb-1">PUP pack</div>
-                <div className="w-full border border-gray-100 rounded-lg px-1 py-2 text-sm text-center bg-gray-50 text-gray-400">{cap['Pack']}</div>
-              </div>
+            ))}
+            <div className="text-center">
+              <div className="text-xs text-gray-400 mb-1">PUP pack(件)</div>
+              <div className="w-full border border-gray-100 rounded-lg px-1 py-2 text-sm text-center bg-gray-50 text-gray-400">{cap['Pack']}</div>
             </div>
           </div>
-          <button
-            onClick={() => setShowInputPopup(true)}
-            className="bg-blue-600 text-white text-base py-4 rounded-xl hover:bg-blue-700 flex items-center justify-center gap-2 flex-1"
-          >
-            📦 残件数を入力
-          </button>
         </div>
+        <button
+          onClick={() => setShowInputPopup(true)}
+          className="bg-blue-600 text-white text-base px-8 rounded-xl hover:bg-blue-700 flex items-center justify-center gap-2 whitespace-nowrap"
+        >
+          📦 残件数を入力
+        </button>
       </div>
 
+      {/* 推移テーブル */}
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-3">
         <div className="font-medium text-base mb-1">時間別推移テーブル</div>
         <div className="text-xs mb-3"><span className="text-gray-700">黒字＝保存済み</span><span className="text-blue-500 ml-2">青字＝予測</span></div>
@@ -533,31 +465,35 @@ export default function Home() {
             <tbody>
               {GROUPS.map(g => (
                 <>
-                  <tr key={`${g.id}-header`} className={`${g.rowbg} cursor-pointer`} onClick={() => setOpenGroups(prev => ({ ...prev, [g.id]: !prev[g.id] }))}>
+                  <tr
+                    key={`${g.id}-header`}
+                    className={`${g.headerBg} cursor-pointer`}
+                    onClick={() => setOpenGroups(prev => ({ ...prev, [g.id]: !prev[g.id] }))}
+                  >
                     <td colSpan={HOURS.length + 1} className={`py-2 px-2 font-medium text-sm ${g.text}`}>
                       {openGroups[g.id] ? '▼' : '▶'} {g.label}
                     </td>
                   </tr>
                   {openGroups[g.id] && CATS.map(cat => (
                     <tr key={`${g.id}-${cat}`} className={g.rowbg}>
-                  <td className={`py-2 px-1 font-medium text-sm whitespace-nowrap ${g.text}`} style={{width: '80px'}}>
-                    <span style={{display: 'inline-block', width: '28px'}}>{cat === 'MH' ? g.label : ''}</span>
-                    <span>{cat}</span>
-                  </td>
-                  {timeline[g.id][cat].map((val, i) => (
-                    <td key={i} className={`py-1 px-1 text-center ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`} style={{fontSize: '15px'}}>
-                      {val === null ? '' : (
-                        <span className={
-                          val === 0 ? 'text-green-600 font-semibold'
-                          : isSavedCell(i) ? 'text-gray-700 font-semibold'
-                          : 'text-blue-500 font-medium'
-                        }>
-                          {val}
-                        </span>
-                      )}
-                    </td>
-                  ))}
-                </tr>
+                      <td className={`py-2 px-1 font-medium text-sm whitespace-nowrap ${g.text}`} style={{width: '80px'}}>
+                        <span style={{display: 'inline-block', width: '28px'}}></span>
+                        <span>{cat}</span>
+                      </td>
+                      {timeline[g.id][cat].map((val, i) => (
+                        <td key={i} className={`py-1 px-1 text-center ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`} style={{fontSize: '15px'}}>
+                          {val === null ? '' : (
+                            <span className={
+                              val === 0 ? 'text-green-600 font-semibold'
+                              : isSavedCell(i) ? 'text-gray-700 font-semibold'
+                              : 'text-blue-500 font-medium'
+                            }>
+                              {val}
+                            </span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
                 </>
               ))}
@@ -566,6 +502,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* 人員配置 */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="font-medium text-base mb-3">人員配置</div>
         <div className="overflow-x-auto">
