@@ -7,9 +7,9 @@ const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','
 const STAFF_HOURS = HOURS
 const CATS = ['MH', 'SS/FS', 'Pack', 'PUP pick', 'PUP pack']
 const GROUPS = [
-  { id: 'p1', label: '+1', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', rowbg: 'bg-red-50/40', headerBg: 'bg-red-100' },
-  { id: 'p2', label: '+2', bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', rowbg: 'bg-yellow-50/40', headerBg: 'bg-yellow-100' },
-  { id: 'p3', label: '+3', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', rowbg: 'bg-blue-50/40', headerBg: 'bg-blue-100' },
+  { id: 'p1', label: '+1', text: 'text-red-600', rowbg: 'bg-red-50/30', headerBg: 'bg-red-50', border: 'border-red-100' },
+  { id: 'p2', label: '+2', text: 'text-amber-600', rowbg: 'bg-amber-50/30', headerBg: 'bg-amber-50', border: 'border-amber-100' },
+  { id: 'p3', label: '+3', text: 'text-blue-500', rowbg: 'bg-blue-50/30', headerBg: 'bg-blue-50', border: 'border-blue-100' },
 ]
 
 type Residuals = { [gid: string]: { [cat: string]: number } }
@@ -128,6 +128,17 @@ export default function Home() {
         })
         setResiduals(latest)
       }
+      // ⑤ 保存データがある日付のみ開く
+      const newOpen: { [gid: string]: boolean } = { p1: false, p2: false, p3: false }
+      let anyOpen = false
+      GROUPS.forEach(g => {
+        const hasData = Object.values(byHour).some(hourData =>
+          CATS.some(cat => (hourData[g.id]?.[cat] ?? 0) > 0)
+        )
+        if (hasData) { newOpen[g.id] = true; anyOpen = true }
+      })
+      if (!anyOpen) { newOpen.p1 = true; newOpen.p2 = true; newOpen.p3 = true }
+      setOpenGroups(newOpen)
     }
 
     const { data: staffData } = await supabase
@@ -174,8 +185,6 @@ export default function Home() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [loadTodayData])
-
-  const effectiveCap = (cat: string) => cat === 'PUP pack' ? cap['Pack'] : cap[cat]
 
   function calcTimeline() {
     const result: { [gid: string]: { [cat: string]: (number | null)[] } } = {}
@@ -232,7 +241,7 @@ export default function Home() {
           const minutes = Math.max(0, stepEnd - stepStart)
           const staffIdx = STAFF_HOURS.indexOf(stepHour)
           const staffCount = staffIdx >= 0 ? (staff[cat][staffIdx] || 0) : 0
-          const processed = (staffCount * effectiveCap(cat) / 60) * minutes
+          const processed = (staffCount * cap[cat] / 60) * minutes
           let remaining = Math.max(0, processed)
           for (const gid of gids) {
             const consume = Math.min(Math.max(0, remValues[gid]), remaining)
@@ -329,6 +338,7 @@ export default function Home() {
     setSavedStaff({})
     setSavedTimes({})
     setManualTime(null)
+    setOpenGroups({ p1: true, p2: true, p3: true })
     setResetting(false)
     setShowResetConfirm(false)
   }
@@ -336,13 +346,7 @@ export default function Home() {
   const timeline = calcTimeline()
 
   return (
-    <main className="p-6 max-w-screen-xl mx-auto" style={{fontSize: '17px'}}>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-medium">Parcel Workload</h1>
-        <button onClick={() => setShowResetConfirm(true)} className="text-sm text-red-500 border border-red-200 px-4 py-1.5 rounded-lg hover:bg-red-50">
-          🔄 リセット
-        </button>
-      </div>
+    <main className="p-6 max-w-screen-xl mx-auto" style={{fontSize: '15px'}}>
 
       {showResetConfirm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -382,7 +386,7 @@ export default function Home() {
             <div className="grid grid-cols-3 gap-3 mb-4">
               {GROUPS.map(g => (
                 <div key={g.id}>
-                  <div className={`text-sm font-medium px-2 py-1 rounded mb-2 text-center ${g.bg} ${g.text}`}>{g.label}</div>
+                  <div className={`text-sm font-medium px-2 py-1 rounded mb-2 text-center ${g.headerBg} ${g.text}`}>{g.label}</div>
                   {CATS.map(cat => (
                     <div key={cat} className="mb-2">
                       <div className="text-xs text-gray-500 mb-1">{catLabel(cat)}</div>
@@ -408,56 +412,65 @@ export default function Home() {
         </div>
       )}
 
-      {/* 上段：推定能力 + 入力ボタン横並び */}
-      <div className="flex gap-3 mb-4 items-stretch">
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex-1">
-          <div className="text-sm text-gray-500 mb-3">⚡ 推定能力</div>
+      {/* ① 上段1行：タイトル・推定能力・入力ボタン+リセット（2:3:2） */}
+      <div className="grid gap-3 mb-4 items-stretch" style={{gridTemplateColumns: '2fr 3fr 2fr'}}>
+        {/* タイトル */}
+        <div className="flex items-center">
+          <h1 className="text-2xl font-medium">Parcel Workload</h1>
+        </div>
+
+        {/* 推定能力 */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="text-xs text-gray-500 mb-2">⚡ 推定能力</div>
           <div className="grid grid-cols-5 gap-2">
-            {(['MH', 'SS/FS', 'Pack', 'PUP pick'] as string[]).map(cat => (
+            {CATS.map(cat => (
               <div key={cat} className="text-center">
-                <div className="text-xs text-gray-400 mb-1">{cat}{cat === 'MH' || cat === 'SS/FS' ? '(OL)' : '(件)'}</div>
+                <div className="text-xs text-gray-400 mb-1">{cat === 'MH' || cat === 'SS/FS' ? `${cat}(OL)` : `${cat}(件)`}</div>
                 <input
                   type="number" min={1}
-                  className="w-full border border-gray-200 rounded-lg px-1 py-2 text-sm text-center"
+                  className="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-sm text-center"
                   value={cap[cat]}
-                  onChange={e => {
-                    const val = parseInt(e.target.value) || 1
-                    setCap(prev => ({
-                      ...prev,
-                      [cat]: val,
-                      ...(cat === 'Pack' ? { 'PUP pack': val } : {})
-                    }))
-                  }}
+                  onChange={e => setCap(prev => ({ ...prev, [cat]: parseInt(e.target.value) || 1 }))}
                 />
               </div>
             ))}
-            <div className="text-center">
-              <div className="text-xs text-gray-400 mb-1">PUP pack(件)</div>
-              <div className="w-full border border-gray-100 rounded-lg px-1 py-2 text-sm text-center bg-gray-50 text-gray-400">{cap['Pack']}</div>
-            </div>
           </div>
         </div>
-        <button
-          onClick={() => setShowInputPopup(true)}
-          className="bg-blue-600 text-white text-base px-8 rounded-xl hover:bg-blue-700 flex items-center justify-center gap-2 whitespace-nowrap"
-        >
-          📦 残件数を入力
-        </button>
+
+        {/* 入力ボタン + リセット */}
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => setShowInputPopup(true)}
+            className="bg-blue-600 text-white text-base py-3 rounded-xl hover:bg-blue-700 flex items-center justify-center gap-2 flex-1"
+          >
+            📦 残件数を入力
+          </button>
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            className="text-sm text-red-400 border border-red-100 py-1.5 rounded-lg hover:bg-red-50"
+          >
+            🔄 リセット
+          </button>
+        </div>
       </div>
 
       {/* 推移テーブル */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-3">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-3" style={{borderRadius: '12px'}}>
         <div className="font-medium text-base mb-1">時間別推移テーブル</div>
-        <div className="text-xs mb-3"><span className="text-gray-700">黒字＝保存済み</span><span className="text-blue-500 ml-2">青字＝予測</span></div>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse" style={{tableLayout: 'fixed', fontSize: '13px'}}>
+        <div className="text-xs mb-3">
+          <span className="text-gray-700">黒字＝保存済み</span>
+          <span className="text-blue-500 ml-2">青字＝予測</span>
+        </div>
+        <div style={{overflowX: 'auto'}}>
+          <table className="w-full border-collapse" style={{tableLayout: 'fixed', fontSize: '13px', borderRadius: '8px', overflow: 'hidden'}}>
             <thead>
-              <tr>
+              <tr style={{borderBottom: '1px solid #e5e7eb'}}>
                 <th className="text-left py-2 px-1 text-gray-400 font-normal" style={{width: '80px'}}></th>
                 {HOURS.map((h, i) => (
-                  <th key={h} className={`py-1 px-0 text-center font-normal text-sm ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '62px'}}>
+                  <th key={h} className={`py-1 px-0 text-center font-normal text-sm ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`} style={{width: '62px', borderLeft: '1px solid #f0f0f0'}}>
                     <div>{h}</div>
-                    {savedTimes[h] && <div className="text-xs text-blue-400">{savedTimes[h]}</div>}
+                    {/* ② 保存時刻は黒太字 */}
+                    {savedTimes[h] && <div className="text-xs font-bold text-gray-700">{savedTimes[h]}</div>}
                   </th>
                 ))}
               </tr>
@@ -468,6 +481,7 @@ export default function Home() {
                   <tr
                     key={`${g.id}-header`}
                     className={`${g.headerBg} cursor-pointer`}
+                    style={{borderTop: '1px solid #e5e7eb'}}
                     onClick={() => setOpenGroups(prev => ({ ...prev, [g.id]: !prev[g.id] }))}
                   >
                     <td colSpan={HOURS.length + 1} className={`py-2 px-2 font-medium text-sm ${g.text}`}>
@@ -475,13 +489,13 @@ export default function Home() {
                     </td>
                   </tr>
                   {openGroups[g.id] && CATS.map(cat => (
-                    <tr key={`${g.id}-${cat}`} className={g.rowbg}>
-                      <td className={`py-2 px-1 font-medium text-sm whitespace-nowrap ${g.text}`} style={{width: '80px'}}>
+                    <tr key={`${g.id}-${cat}`} className={g.rowbg} style={{borderBottom: '1px solid #f3f4f6'}}>
+                      <td className={`py-2 px-1 font-medium text-sm whitespace-nowrap ${g.text}`} style={{width: '80px', borderRight: '1px solid #f0f0f0'}}>
                         <span style={{display: 'inline-block', width: '28px'}}></span>
                         <span>{cat}</span>
                       </td>
                       {timeline[g.id][cat].map((val, i) => (
-                        <td key={i} className={`py-1 px-1 text-center ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`} style={{fontSize: '15px'}}>
+                        <td key={i} className={`py-1 px-1 text-center ${i === effectiveCurIdx ? 'bg-blue-50' : ''}`} style={{fontSize: '15px', borderLeft: '1px solid #f3f4f6'}}>
                           {val === null ? '' : (
                             <span className={
                               val === 0 ? 'text-green-600 font-semibold'
@@ -503,28 +517,28 @@ export default function Home() {
       </div>
 
       {/* 人員配置 */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-4" style={{borderRadius: '12px'}}>
         <div className="font-medium text-base mb-3">人員配置</div>
-        <div className="overflow-x-auto">
+        <div style={{overflowX: 'auto'}}>
           <table className="w-full border-collapse" style={{tableLayout: 'fixed', fontSize: '13px'}}>
             <thead>
-              <tr>
+              <tr style={{borderBottom: '1px solid #e5e7eb'}}>
                 <th className="text-left py-2 px-1 text-gray-400 font-normal" style={{width: '80px'}}></th>
                 {STAFF_HOURS.map((h, i) => (
-                  <th key={h} className={`py-2 px-0 text-center font-normal text-sm ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700 rounded' : 'text-gray-400'}`} style={{width: '62px'}}>{h}</th>
+                  <th key={h} className={`py-2 px-0 text-center font-normal text-sm ${i === effectiveCurIdx ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`} style={{width: '62px', borderLeft: '1px solid #f0f0f0'}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {CATS.map(cat => (
-                <tr key={cat}>
-                  <td className="py-2 px-1 font-medium text-sm text-gray-600 whitespace-nowrap" style={{width: '80px'}}>{cat}</td>
+                <tr key={cat} style={{borderBottom: '1px solid #f3f4f6'}}>
+                  <td className="py-2 px-1 font-medium text-sm text-gray-600 whitespace-nowrap" style={{width: '80px', borderRight: '1px solid #f0f0f0'}}>{cat}</td>
                   {staff[cat].map((val, hi) => {
                     const isPast = isStaffPast(hi)
                     const isSaved = isStaffSaved(hi)
                     const isLast = hi === HOURS.length - 1
                     return (
-                      <td key={hi} className={`py-1 px-1 text-center ${hi === effectiveCurIdx ? 'bg-blue-50' : ''}`}>
+                      <td key={hi} className={`py-1 px-1 text-center ${hi === effectiveCurIdx ? 'bg-blue-50' : ''}`} style={{borderLeft: '1px solid #f3f4f6'}}>
                         {isLast ? (
                           <span className="text-gray-200">—</span>
                         ) : isPast && !isSaved ? (
