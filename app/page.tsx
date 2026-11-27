@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 
 const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00']
 const STAFF_HOURS = HOURS
-const CATS = ['MH', 'SS/FS', 'Pack', 'PUP pick', 'PUP pack']
+const CATS = ['MH', 'SS/FS', 'Pack']
 const GROUPS = [
   { id: 'p1', label: '+1', text: 'text-red-600', rowbg: 'bg-red-50/30', headerBg: 'bg-red-50', border: 'border-red-100' },
   { id: 'p2', label: '+2', text: 'text-amber-600', rowbg: 'bg-amber-50/30', headerBg: 'bg-amber-50', border: 'border-amber-100' },
@@ -423,8 +423,8 @@ export default function Home() {
         {/* 推定能力 */}
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <div className="text-xs text-gray-500 mb-2">⚡ 推定能力</div>
-          <div className="grid grid-cols-5 gap-2">
-            {CATS.map(cat => (
+<div className="grid grid-cols-3 gap-2">
+  {CATS.map(cat => (
               <div key={cat} className="text-center">
                 <div className="text-xs text-gray-400 mb-1">{cat === 'MH' || cat === 'SS/FS' ? `${cat}(OL)` : `${cat}(件)`}</div>
                 <input
