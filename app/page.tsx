@@ -234,9 +234,10 @@ export default function Home() {
         const remValues: { [gid: string]: number } = {}
         gids.forEach(gid => { remValues[gid] = startValues[gid] })
 
-        for (let step = latestSaveHourIdx; step < hi; step++) {
+        const startIdx = latestSaveHourIdx === -1 ? effectiveCurIdx : latestSaveHourIdx
+        for (let step = startIdx; step < hi; step++) {
           const stepHour = HOURS[step]
-          const stepStart = step === latestSaveHourIdx ? saveTimeMin : toMinutes(stepHour)
+          const stepStart = step === startIdx ? saveTimeMin : toMinutes(stepHour)
           const stepEnd = toMinutes(HOURS[step + 1])
           const minutes = Math.max(0, stepEnd - stepStart)
           const staffIdx = STAFF_HOURS.indexOf(stepHour)
